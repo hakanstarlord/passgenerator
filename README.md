@@ -17,29 +17,42 @@ Güvenli ve kullanımı kolay masaüstü şifre üretici uygulaması.
 - **Koyu tema** — Göz yormayan karanlık arayüz
 - **Masaüstü uygulaması** — Electron ile Windows portable exe olarak dağıtılabilir
 
-## Kurulum
+## Hızlı Başlangıç
+
+Projeyi kendi bilgisayarınıza kurmak için aşağıdaki adımları izleyin:
+
+### Gereksinimler
+
+- [Node.js](https://nodejs.org/) (v18 veya üzeri)
+- [Git](https://git-scm.com/)
+
+### Kurulum
 
 ```bash
+# 1. Projeyi klonlayın
 git clone https://github.com/hakanstarlord/passgenerator.git
+
+# 2. Proje klasörüne girin
 cd passgenerator
+
+# 3. Bağımlılıkları yükleyin
 npm install
 ```
 
-## Kullanım
+### Çalıştırma
 
 ```bash
-# Geliştirme sunucusu (tarayıcı)
+# Tarayıcıda açmak için
 npm run dev
 
-# Electron ile çalıştırma
+# Masaüstü uygulaması olarak açmak için
 npm run electron:dev
 
-# Production build (web)
-npm run build
-
-# Portable exe oluşturma (Windows)
+# Windows portable exe oluşturmak için
 npm run electron:build
 ```
+
+`npm run dev` komutu çalıştıktan sonra terminalde görünen adresi (varsayılan: `http://localhost:5173`) tarayıcınızda açın.
 
 ## Teknolojiler
 
