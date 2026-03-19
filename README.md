@@ -1,16 +1,70 @@
-# React + Vite
+# PassGen — Şifre Üretici
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Güvenli ve kullanımı kolay masaüstü şifre üretici uygulaması.
 
-Currently, two official plugins are available:
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3-06B6D4?logo=tailwindcss&logoColor=white)
+![Electron](https://img.shields.io/badge/Electron-41-47848F?logo=electron&logoColor=white)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Özellikler
 
-## React Compiler
+- **Güvenli üretim** — `crypto.getRandomValues()` ile kriptografik olarak güvenli şifre üretimi
+- **Özelleştirilebilir** — Uzunluk (8–128), büyük/küçük harf, rakam, özel karakter seçenekleri
+- **Güçlük göstergesi** — Üretilen şifrenin güçlük seviyesini anlık olarak gösterir
+- **Çoklu üretim** — Tek seferde birden fazla şifre üretebilme
+- **Geçmiş** — Üretilen şifreler localStorage'da saklanır
+- **Koyu tema** — Göz yormayan karanlık arayüz
+- **Masaüstü uygulaması** — Electron ile Windows portable exe olarak dağıtılabilir
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Kurulum
 
-## Expanding the ESLint configuration
+```bash
+git clone https://github.com/hakanstarlord/passgenerator.git
+cd passgenerator
+npm install
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Kullanım
+
+```bash
+# Geliştirme sunucusu (tarayıcı)
+npm run dev
+
+# Electron ile çalıştırma
+npm run electron:dev
+
+# Production build (web)
+npm run build
+
+# Portable exe oluşturma (Windows)
+npm run electron:build
+```
+
+## Teknolojiler
+
+| Teknoloji | Kullanım |
+|-----------|----------|
+| React 19 | Arayüz bileşenleri |
+| Vite 8 | Build aracı |
+| TailwindCSS 3 | Stil |
+| Lucide React | İkonlar |
+| Electron 41 | Masaüstü uygulaması |
+
+## Proje Yapısı
+
+```
+├── build/              # Uygulama ikonu (electron-builder)
+├── electron/           # Electron ana süreç
+├── public/             # Statik dosyalar
+├── src/
+│   ├── App.jsx               # Ana konteyner, tab yönetimi
+│   ├── GeneratorPanel.jsx    # Şifre üretim paneli
+│   ├── HistoryPanel.jsx      # Geçmiş paneli
+│   ├── hooks/                # Özel React hook'ları
+│   └── utils/                # Yardımcı fonksiyonlar
+```
+
+## Lisans
+
+MIT
