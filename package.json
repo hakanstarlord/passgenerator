@@ -41,10 +41,13 @@
     },
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron/**/*",
+      "build/icon.ico"
     ],
+    "afterPack": "electron/setIcon.cjs",
     "win": {
       "target": "portable",
+      "icon": "build/icon.ico",
       "signAndEditExecutable": false
     }
   }

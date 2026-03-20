@@ -8,7 +8,7 @@ function createWindow() {
     minWidth: 600,
     minHeight: 500,
     title: 'Şifre Üretici',
-    icon: join(app.getAppPath(), 'build', 'icon.png'),
+    icon: join(app.getAppPath(), 'build', 'icon.ico'),
     autoHideMenuBar: true,
     backgroundColor: '#0f0f0f',
     webPreferences: {
