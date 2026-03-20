@@ -9,13 +9,16 @@ Güvenli ve kullanımı kolay masaüstü şifre üretici uygulaması.
 
 ## Özellikler
 
-- **Güvenli üretim** — `crypto.getRandomValues()` ile kriptografik olarak güvenli şifre üretimi
+- **Güvenli üretim** — `crypto.getRandomValues()` ile kriptografik olarak güvenli şifre üretimi (rejection sampling ile modulo bias önlemi)
 - **Özelleştirilebilir** — Uzunluk (8–128), büyük/küçük harf, rakam, özel karakter seçenekleri
 - **Güçlük göstergesi** — Üretilen şifrenin güçlük seviyesini anlık olarak gösterir
 - **Çoklu üretim** — Tek seferde birden fazla şifre üretebilme
-- **Geçmiş** — Üretilen şifreler localStorage'da saklanır
+- **Şifreli kasa** — Kayıtlı şifreler AES-GCM ile şifrelenir, PBKDF2 (600.000 iterasyon) ile anahtar türetilir
+- **Geçmiş** — Üretilen şifreler localStorage'da saklanır (maks. 100 kayıt, 30 gün otomatik temizleme)
+- **Pano güvenliği** — Kopyalanan şifreler 30 saniye sonra panodan otomatik temizlenir
 - **Koyu tema** — Göz yormayan karanlık arayüz
 - **Masaüstü uygulaması** — Electron ile Windows portable exe olarak dağıtılabilir
+- **Electron güvenliği** — CSP header, sandbox, dış navigasyon engeli
 
 ## Hızlı Başlangıç
 
@@ -68,14 +71,20 @@ npm run electron:build
 
 ```
 ├── build/              # Uygulama ikonu (electron-builder)
-├── electron/           # Electron ana süreç
+├── electron/           # Electron ana süreç (CSP, sandbox, navigasyon kısıtlamaları)
 ├── public/             # Statik dosyalar
 ├── src/
 │   ├── App.jsx               # Ana konteyner, tab yönetimi
 │   ├── GeneratorPanel.jsx    # Şifre üretim paneli
 │   ├── HistoryPanel.jsx      # Geçmiş paneli
-│   ├── hooks/                # Özel React hook'ları
-│   └── utils/                # Yardımcı fonksiyonlar
+│   ├── VaultPanel.jsx        # Kasa paneli (kurulum / kilit / açık)
+│   ├── hooks/
+│   │   ├── usePasswordHistory.js   # Geçmiş hook (boyut sınırlı)
+│   │   └── useSavedPasswords.js    # Kasa hook (AES-GCM şifreli)
+│   └── utils/
+│       ├── passwordGenerator.js    # Şifre üretimi, güçlük hesaplama
+│       ├── clipboard.js            # Pano yardımcısı (otomatik temizleme)
+│       └── crypto.js               # AES-GCM şifreleme, PBKDF2 anahtar türetme
 ```
 
 ## Lisans

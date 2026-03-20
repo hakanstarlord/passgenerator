@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { Copy, Check, Trash2, Eye, EyeOff, Search, AlertTriangle, ShieldOff } from 'lucide-react'
+import { copyToClipboard } from './utils/clipboard'
 
 function timeAgo(dateStr) {
   const now = Date.now()
@@ -26,7 +27,7 @@ function HistoryRow({ item, onRemove }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(item.password)
+    await copyToClipboard(item.password)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }, [item.password])

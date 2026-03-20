@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
-import { Sparkles, Plus, Minus, Copy, Check, ClipboardList } from 'lucide-react'
+import { Sparkles, Plus, Minus, Copy, Check, ClipboardList, Landmark, Wifi, AtSign, Mail, Hash } from 'lucide-react'
 import { generatePassword, calculateStrength } from './utils/passwordGenerator'
+import { copyToClipboard } from './utils/clipboard'
 
 const charOptions = [
   { id: 'uppercase', label: 'Büyük harfler', desc: 'A-Z' },
@@ -10,6 +11,16 @@ const charOptions = [
 ]
 
 const quickLengths = [8, 12, 16, 24, 32]
+
+const profileIcons = { Landmark, Wifi, AtSign, Mail, Hash }
+
+const PRESET_PROFILES = [
+  { id: 'bank', name: 'Banka', icon: 'Landmark', length: 16, count: 1, charTypes: { uppercase: true, lowercase: true, numbers: true, symbols: true } },
+  { id: 'wifi', name: 'Wi-Fi', icon: 'Wifi', length: 24, count: 1, charTypes: { uppercase: true, lowercase: true, numbers: true, symbols: false } },
+  { id: 'social', name: 'Sosyal Medya', icon: 'AtSign', length: 14, count: 1, charTypes: { uppercase: true, lowercase: true, numbers: true, symbols: true } },
+  { id: 'email', name: 'E-posta', icon: 'Mail', length: 16, count: 1, charTypes: { uppercase: true, lowercase: true, numbers: true, symbols: false } },
+  { id: 'pin', name: 'PIN', icon: 'Hash', length: 6, count: 1, charTypes: { uppercase: false, lowercase: false, numbers: true, symbols: false } },
+]
 
 function ToggleSwitch({ enabled, onChange, disabled }) {
   return (
@@ -34,7 +45,7 @@ function PasswordCard({ value, strength, index }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(value)
+    await copyToClipboard(value)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }, [value])
@@ -91,7 +102,7 @@ function PasswordCard({ value, strength, index }) {
   )
 }
 
-export default function GeneratorPanel({ onGenerate }) {
+export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocked }) {
   const [length, setLength] = useState(16)
   const [count, setCount] = useState(1)
   const [charTypes, setCharTypes] = useState({
@@ -103,7 +114,25 @@ export default function GeneratorPanel({ onGenerate }) {
 
   const [passwords, setPasswords] = useState([])
   const [copiedAll, setCopiedAll] = useState(false)
+  const [vaultName, setVaultName] = useState('')
+  const [savedToVault, setSavedToVault] = useState(false)
+  const [vaultWarning, setVaultWarning] = useState(false)
   const activeCount = Object.values(charTypes).filter(Boolean).length
+
+  const activeProfile = PRESET_PROFILES.find((p) =>
+    p.length === length &&
+    p.count === count &&
+    p.charTypes.uppercase === charTypes.uppercase &&
+    p.charTypes.lowercase === charTypes.lowercase &&
+    p.charTypes.numbers === charTypes.numbers &&
+    p.charTypes.symbols === charTypes.symbols
+  )
+
+  const applyProfile = useCallback((profile) => {
+    setLength(profile.length)
+    setCount(profile.count)
+    setCharTypes({ ...profile.charTypes })
+  }, [])
 
   function toggleCharType(id) {
     if (charTypes[id] && activeCount <= 1) return
@@ -119,20 +148,47 @@ export default function GeneratorPanel({ onGenerate }) {
     setPasswords(generated)
     setCopiedAll(false)
 
-    const historyEntries = generated.map((pw) => ({
-      id: crypto.randomUUID(),
-      password: pw.value,
-      strength: pw.strength,
-      length,
-      date: new Date().toISOString(),
-      charTypes: { ...charTypes },
-    }))
-    onGenerate?.(historyEntries)
+    const savingToVault = vaultName.trim() && !isVaultLocked
+
+    // Kasaya kaydedilen şifreleri geçmişe ekleme
+    if (!savingToVault) {
+      const historyEntries = generated.map((pw) => ({
+        id: crypto.randomUUID(),
+        password: pw.value,
+        strength: pw.strength,
+        length,
+        date: new Date().toISOString(),
+        charTypes: { ...charTypes },
+      }))
+      onGenerate?.(historyEntries)
+    }
+
+    if (vaultName.trim()) {
+      if (isVaultLocked) {
+        setVaultWarning(true)
+        setTimeout(() => setVaultWarning(false), 3000)
+      } else {
+        generated.forEach((pw, i) => {
+          onSaveToVault?.({
+            id: crypto.randomUUID(),
+            name: count > 1 ? `${vaultName.trim()} (${i + 1})` : vaultName.trim(),
+            password: pw.value,
+            strength: pw.strength,
+            length,
+            charTypes: { ...charTypes },
+            date: new Date().toISOString(),
+          })
+        })
+        setSavedToVault(true)
+        setTimeout(() => setSavedToVault(false), 2000)
+        setVaultName('')
+      }
+    }
   }
 
   async function handleCopyAll() {
     const text = passwords.map((p) => p.value).join('\n')
-    await navigator.clipboard.writeText(text)
+    await copyToClipboard(text)
     setCopiedAll(true)
     setTimeout(() => setCopiedAll(false), 1500)
   }
@@ -140,6 +196,32 @@ export default function GeneratorPanel({ onGenerate }) {
   return (
     <div className="max-w-xl">
       <h1 className="text-2xl font-bold mb-6">Şifre Oluştur</h1>
+
+      {/* Profiles */}
+      <section className="mb-8">
+        <label className="text-sm font-medium text-gray-300 block mb-3">Profiller</label>
+        <div className="flex flex-wrap gap-2">
+          {PRESET_PROFILES.map((profile) => {
+            const Icon = profileIcons[profile.icon]
+            const isActive = activeProfile?.id === profile.id
+            return (
+              <button
+                key={profile.id}
+                onClick={() => applyProfile(profile)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                  isActive
+                    ? 'bg-indigo-500/20 text-indigo-400 ring-1 ring-indigo-500/30'
+                    : 'bg-white/[0.03] border border-white/[0.06] text-gray-400 hover:bg-white/[0.06] hover:text-gray-200'
+                }`}
+                title={`${profile.length} karakter, ${profile.count} adet`}
+              >
+                <Icon size={14} />
+                {profile.name}
+              </button>
+            )
+          })}
+        </div>
+      </section>
 
       {/* Length */}
       <section className="mb-8">
@@ -225,6 +307,20 @@ export default function GeneratorPanel({ onGenerate }) {
         </div>
       </section>
 
+      {/* Vault name */}
+      <section className="mb-5">
+        <label className="text-sm font-medium text-gray-300 block mb-2">Kasaya Kaydet (isteğe bağlı)</label>
+        <input
+          type="text"
+          value={vaultName}
+          onChange={(e) => setVaultName(e.target.value)}
+          placeholder="Şifre adı girin (ör: Netflix, Banka)..."
+          maxLength={30}
+          className="w-full px-4 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/25 transition-all"
+        />
+        <p className="text-xs text-gray-600 mt-1.5">Ad girilirse şifre otomatik olarak kasaya kaydedilir.</p>
+      </section>
+
       {/* Generate button */}
       <button
         onClick={handleGenerate}
@@ -233,6 +329,18 @@ export default function GeneratorPanel({ onGenerate }) {
         <Sparkles size={18} />
         Şifre Oluştur
       </button>
+
+      {savedToVault && (
+        <div className="mt-3 text-center text-sm text-green-400 font-medium animate-pulse">
+          Kasaya kaydedildi ✓
+        </div>
+      )}
+
+      {vaultWarning && (
+        <div className="mt-3 text-center text-sm text-amber-400 font-medium animate-pulse">
+          Kasa kilitli — kaydetmek için önce kasanın kilidini açın.
+        </div>
+      )}
 
       {/* Results */}
       {passwords.length > 0 && (

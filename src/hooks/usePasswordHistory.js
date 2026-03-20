@@ -1,11 +1,21 @@
 import { useState, useCallback } from 'react'
 
 const STORAGE_KEY = 'passgen_history'
+const MAX_HISTORY_SIZE = 100
+const MAX_AGE_DAYS = 30
 
 function readStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
+    if (!raw) return []
+    const data = JSON.parse(raw)
+    // 30 günden eski kayıtları otomatik temizle
+    const cutoff = Date.now() - MAX_AGE_DAYS * 86400000
+    const filtered = data.filter((item) => new Date(item.date).getTime() > cutoff)
+    if (filtered.length !== data.length) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered))
+    }
+    return filtered
   } catch {
     return []
   }
@@ -20,7 +30,7 @@ export default function usePasswordHistory() {
 
   const addToHistory = useCallback((entries) => {
     setHistory((prev) => {
-      const next = [...entries, ...prev]
+      const next = [...entries, ...prev].slice(0, MAX_HISTORY_SIZE)
       writeStorage(next)
       return next
     })
