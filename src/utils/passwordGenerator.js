@@ -49,6 +49,16 @@ export function generatePassword(length, { uppercase, lowercase, numbers, symbol
   return shuffle([...guaranteed, ...remaining]).join('')
 }
 
+export function calculateEntropy(length, charTypes) {
+  let charsetSize = 0
+  if (charTypes.uppercase) charsetSize += CHAR_SETS.uppercase.length
+  if (charTypes.lowercase) charsetSize += CHAR_SETS.lowercase.length
+  if (charTypes.numbers) charsetSize += CHAR_SETS.numbers.length
+  if (charTypes.symbols) charsetSize += CHAR_SETS.symbols.length
+  if (charsetSize === 0) return 0
+  return Math.floor(length * Math.log2(charsetSize))
+}
+
 export function calculateStrength(password) {
   if (!password) return { score: 0, label: 'Çok Zayıf', color: '#ef4444' }
 

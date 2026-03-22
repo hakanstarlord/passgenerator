@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Key, History, Lock, Maximize2, Minimize2 } from 'lucide-react'
+import { Key, History, Lock, Maximize2, Minimize2, AlertTriangle, ArrowUpCircle, X } from 'lucide-react'
 import GeneratorPanel from './GeneratorPanel'
 import HistoryPanel from './HistoryPanel'
 import VaultPanel from './VaultPanel'
 import usePasswordHistory from './hooks/usePasswordHistory'
 import useSavedPasswords from './hooks/useSavedPasswords'
+import useAutoLock from './hooks/useAutoLock'
 
 const tabs = [
   { id: 'generate', label: 'Oluştur', icon: Key },
@@ -15,12 +16,17 @@ const tabs = [
 function App() {
   const [activeTab, setActiveTab] = useState('generate')
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [updateInfo, setUpdateInfo] = useState(null)
+  const [updateDismissed, setUpdateDismissed] = useState(false)
   const { history, addToHistory, removeFromHistory, clearHistory } = usePasswordHistory()
   const {
     savedPasswords, isLocked, isInitialized, needsMigration,
     unlock, lock, setupMasterPassword,
-    savePassword, removePassword, clearAll: clearVault
+    savePassword, removePassword, clearAll: clearVault,
+    updatePassword, importPasswords, restorePassword, getMasterPassword
   } = useSavedPasswords()
+
+  const { showWarning: showAutoLockWarning, remainingSeconds: autoLockSeconds } = useAutoLock(isLocked, lock)
 
   const toggleFullscreen = useCallback(async () => {
     if (window.electronAPI) {
@@ -45,8 +51,39 @@ function App() {
     }
   }, [])
 
+  // Güncelleme kontrolü
+  useEffect(() => {
+    if (window.electronAPI?.checkForUpdates) {
+      window.electronAPI.checkForUpdates()
+        .then((info) => {
+          if (info?.hasUpdate) setUpdateInfo(info)
+        })
+        .catch(() => {})
+    }
+  }, [])
+
   return (
     <div className="h-screen flex flex-col bg-[#0f0f0f] text-white overflow-hidden">
+      {/* Update Banner */}
+      {updateInfo?.hasUpdate && !updateDismissed && (
+        <div className="px-4 py-2 bg-indigo-500/10 border-b border-indigo-500/20 text-indigo-400 text-xs flex items-center justify-center gap-2 shrink-0">
+          <ArrowUpCircle size={14} />
+          <span>Yeni sürüm mevcut: v{updateInfo.latestVersion}</span>
+          <button
+            onClick={() => window.electronAPI?.openExternal(updateInfo.releaseUrl)}
+            className="px-2 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 font-medium transition-all"
+          >
+            GitHub&apos;da Görüntüle
+          </button>
+          <button
+            onClick={() => setUpdateDismissed(true)}
+            className="ml-auto p-0.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-all"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Title Bar */}
       <div className="flex items-center justify-between px-4 h-12 bg-[#16213e] border-b border-white/10 shrink-0">
         <span className="text-sm font-semibold tracking-wide flex items-center gap-2">
@@ -61,6 +98,14 @@ function App() {
           {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
         </button>
       </div>
+
+      {/* Auto-Lock Warning Banner */}
+      {showAutoLockWarning && (
+        <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-400 text-xs flex items-center justify-center gap-2 shrink-0">
+          <AlertTriangle size={14} />
+          <span>Hareketsizlik nedeniyle kasa {autoLockSeconds} saniye içinde kilitlenecek.</span>
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
@@ -87,11 +132,22 @@ function App() {
 
         {/* Content */}
         <main className="flex-1 p-8 overflow-y-auto">
-          {activeTab === 'generate' && <GeneratorPanel onGenerate={addToHistory} onSaveToVault={savePassword} isVaultLocked={isLocked} />}
+          {activeTab === 'generate' && (
+            <GeneratorPanel
+              onGenerate={addToHistory}
+              onSaveToVault={savePassword}
+              isVaultLocked={isLocked}
+              savedPasswords={savedPasswords}
+            />
+          )}
           {activeTab === 'vault' && (
             <VaultPanel
               passwords={savedPasswords}
               removePassword={removePassword}
+              restorePassword={restorePassword}
+              updatePassword={updatePassword}
+              importPasswords={importPasswords}
+              getMasterPassword={getMasterPassword}
               clearAll={clearVault}
               isLocked={isLocked}
               isInitialized={isInitialized}

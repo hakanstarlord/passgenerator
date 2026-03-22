@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { encrypt, decrypt, hashPassword } from '../utils/crypto'
+import { calculateStrength } from '../utils/passwordGenerator'
+import { normalizeCategory } from '../utils/categories'
 
 const STORAGE_KEY = 'passgen_vault'
 const BACKUP_KEY = 'passgen_vault_backup'
@@ -49,7 +51,7 @@ export default function useSavedPasswords() {
     // Eski düz metin verisi varsa migrasyon yap
     if (needsMigration) {
       localStorage.setItem(BACKUP_KEY, JSON.stringify(stored))
-      initialPasswords = stored
+      initialPasswords = stored.map(normalizeCategory)
     }
 
     const plaintext = JSON.stringify(initialPasswords)
@@ -83,7 +85,7 @@ export default function useSavedPasswords() {
 
     try {
       const plaintext = await decrypt(stored.data, password)
-      const passwords = JSON.parse(plaintext)
+      const passwords = JSON.parse(plaintext).map(normalizeCategory)
       masterPasswordRef.current = password
       setSavedPasswords(passwords)
       setIsLocked(false)
@@ -120,6 +122,49 @@ export default function useSavedPasswords() {
     setSavedPasswords([])
   }, [isLocked, persistEncrypted])
 
+  const updatePassword = useCallback(async (id, updates) => {
+    if (isLocked || !masterPasswordRef.current) return
+    const next = savedPasswords.map(item => {
+      if (item.id !== id) return item
+      const updated = { ...item, ...updates }
+      if (updates.password && updates.password !== item.password) {
+        updated.strength = calculateStrength(updates.password)
+        updated.length = updates.password.length
+      }
+      return updated
+    })
+    await persistEncrypted(next, masterPasswordRef.current)
+    setSavedPasswords(next)
+  }, [isLocked, savedPasswords, persistEncrypted])
+
+  const importPasswords = useCallback(async (entries, mode) => {
+    if (isLocked || !masterPasswordRef.current) return
+    let next
+    if (mode === 'replace') {
+      next = entries.map(e => normalizeCategory({ ...e, id: crypto.randomUUID() }))
+    } else {
+      const existingPasswords = new Set(savedPasswords.map(p => p.password))
+      const newEntries = entries
+        .filter(e => !existingPasswords.has(e.password))
+        .map(e => normalizeCategory({ ...e, id: crypto.randomUUID() }))
+      next = [...savedPasswords, ...newEntries]
+    }
+    await persistEncrypted(next, masterPasswordRef.current)
+    setSavedPasswords(next)
+  }, [isLocked, savedPasswords, persistEncrypted])
+
+  const restorePassword = useCallback(async (entry) => {
+    if (isLocked || !masterPasswordRef.current) return false
+    const next = [entry, ...savedPasswords]
+    await persistEncrypted(next, masterPasswordRef.current)
+    setSavedPasswords(next)
+    return true
+  }, [isLocked, savedPasswords, persistEncrypted])
+
+  const getMasterPassword = useCallback(() => {
+    return masterPasswordRef.current
+  }, [])
+
   return {
     savedPasswords,
     isLocked,
@@ -130,6 +175,10 @@ export default function useSavedPasswords() {
     setupMasterPassword,
     savePassword,
     removePassword,
-    clearAll
+    clearAll,
+    updatePassword,
+    importPasswords,
+    restorePassword,
+    getMasterPassword
   }
 }

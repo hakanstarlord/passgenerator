@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react'
-import { Sparkles, Plus, Minus, Copy, Check, ClipboardList, Landmark, Wifi, AtSign, Mail, Hash } from 'lucide-react'
-import { generatePassword, calculateStrength } from './utils/passwordGenerator'
+import { Sparkles, Plus, Minus, Copy, Check, ClipboardList, Landmark, Wifi, AtSign, Mail, Hash, AlertTriangle, Shield } from 'lucide-react'
+import { generatePassword, calculateStrength, calculateEntropy } from './utils/passwordGenerator'
 import { copyToClipboard } from './utils/clipboard'
+import { findDuplicatePassword } from './utils/duplicateCheck'
+import { CATEGORIES } from './utils/categories'
 
 const charOptions = [
   { id: 'uppercase', label: 'Büyük harfler', desc: 'A-Z' },
@@ -41,7 +43,7 @@ function ToggleSwitch({ enabled, onChange, disabled }) {
   )
 }
 
-function PasswordCard({ value, strength, index }) {
+function PasswordCard({ value, strength, entropy, index }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = useCallback(async () => {
@@ -91,6 +93,12 @@ function PasswordCard({ value, strength, index }) {
         >
           {strength.label}
         </span>
+        {entropy != null && (
+          <span className="flex items-center gap-1 text-xs text-gray-500 font-mono shrink-0">
+            <Shield size={12} className="text-gray-600" />
+            ~{entropy} bit
+          </span>
+        )}
       </div>
 
       {copied && (
@@ -102,7 +110,7 @@ function PasswordCard({ value, strength, index }) {
   )
 }
 
-export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocked }) {
+export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocked, savedPasswords }) {
   const [length, setLength] = useState(16)
   const [count, setCount] = useState(1)
   const [charTypes, setCharTypes] = useState({
@@ -115,8 +123,11 @@ export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocke
   const [passwords, setPasswords] = useState([])
   const [copiedAll, setCopiedAll] = useState(false)
   const [vaultName, setVaultName] = useState('')
+  const [vaultCategory, setVaultCategory] = useState('other')
   const [savedToVault, setSavedToVault] = useState(false)
   const [vaultWarning, setVaultWarning] = useState(false)
+  const [duplicateWarning, setDuplicateWarning] = useState(null)
+  const [pendingVaultEntries, setPendingVaultEntries] = useState(null)
   const activeCount = Object.values(charTypes).filter(Boolean).length
 
   const activeProfile = PRESET_PROFILES.find((p) =>
@@ -140,10 +151,11 @@ export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocke
   }
 
   function handleGenerate() {
+    const entropy = calculateEntropy(length, charTypes)
     const generated = Array.from({ length: count }, () => {
       const value = generatePassword(length, charTypes)
       const strength = calculateStrength(value)
-      return { value, strength }
+      return { value, strength, entropy }
     })
     setPasswords(generated)
     setCopiedAll(false)
@@ -168,22 +180,49 @@ export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocke
         setVaultWarning(true)
         setTimeout(() => setVaultWarning(false), 3000)
       } else {
-        generated.forEach((pw, i) => {
-          onSaveToVault?.({
-            id: crypto.randomUUID(),
-            name: count > 1 ? `${vaultName.trim()} (${i + 1})` : vaultName.trim(),
-            password: pw.value,
-            strength: pw.strength,
-            length,
-            charTypes: { ...charTypes },
-            date: new Date().toISOString(),
-          })
-        })
-        setSavedToVault(true)
-        setTimeout(() => setSavedToVault(false), 2000)
-        setVaultName('')
+        const vaultEntries = generated.map((pw, i) => ({
+          id: crypto.randomUUID(),
+          name: count > 1 ? `${vaultName.trim()} (${i + 1})` : vaultName.trim(),
+          password: pw.value,
+          strength: pw.strength,
+          length,
+          charTypes: { ...charTypes },
+          category: vaultCategory,
+          date: new Date().toISOString(),
+        }))
+
+        const duplicateName = generated.reduce((found, pw) => {
+          if (found) return found
+          return findDuplicatePassword(pw.value, savedPasswords)
+        }, null)
+
+        if (duplicateName) {
+          setDuplicateWarning({ duplicateName })
+          setPendingVaultEntries(vaultEntries)
+        } else {
+          vaultEntries.forEach(entry => onSaveToVault?.(entry))
+          setSavedToVault(true)
+          setTimeout(() => setSavedToVault(false), 2000)
+          setVaultName('')
+          setVaultCategory('other')
+        }
       }
     }
+  }
+
+  function handleSaveDuplicate() {
+    pendingVaultEntries?.forEach(entry => onSaveToVault?.(entry))
+    setSavedToVault(true)
+    setTimeout(() => setSavedToVault(false), 2000)
+    setVaultName('')
+    setVaultCategory('other')
+    setDuplicateWarning(null)
+    setPendingVaultEntries(null)
+  }
+
+  function handleCancelDuplicate() {
+    setDuplicateWarning(null)
+    setPendingVaultEntries(null)
   }
 
   async function handleCopyAll() {
@@ -319,6 +358,27 @@ export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocke
           className="w-full px-4 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/25 transition-all"
         />
         <p className="text-xs text-gray-600 mt-1.5">Ad girilirse şifre otomatik olarak kasaya kaydedilir.</p>
+        {vaultName.trim() && (
+          <div className="mt-2">
+            <label className="text-xs text-gray-500 block mb-1.5">Kategori</label>
+            <div className="flex flex-wrap gap-1.5">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setVaultCategory(cat.id)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                    vaultCategory === cat.id
+                      ? 'bg-indigo-500/20 text-indigo-400 ring-1 ring-indigo-500/30'
+                      : 'bg-white/[0.03] border border-white/[0.06] text-gray-400 hover:bg-white/[0.06] hover:text-gray-200'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Generate button */}
@@ -339,6 +399,29 @@ export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocke
       {vaultWarning && (
         <div className="mt-3 text-center text-sm text-amber-400 font-medium animate-pulse">
           Kasa kilitli — kaydetmek için önce kasanın kilidini açın.
+        </div>
+      )}
+
+      {duplicateWarning && (
+        <div className="mt-3 px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+          <p className="text-sm text-amber-400 mb-2 flex items-center gap-1.5">
+            <AlertTriangle size={14} className="shrink-0" />
+            Bu şifre kasanızda zaten mevcut: <strong>{duplicateWarning.duplicateName}</strong>
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={handleSaveDuplicate}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-all"
+            >
+              Yine de Kaydet
+            </button>
+            <button
+              onClick={handleCancelDuplicate}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 text-gray-400 hover:bg-white/10 transition-all"
+            >
+              İptal
+            </button>
+          </div>
         </div>
       )}
 
@@ -373,6 +456,7 @@ export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocke
                 key={`${pw.value}-${i}`}
                 value={pw.value}
                 strength={pw.strength}
+                entropy={pw.entropy}
                 index={i}
               />
             ))}
