@@ -24,8 +24,9 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 │   └── icon.ico                   # Windows ikonu (exe'ye gömülür, rcedit ile)
 ├── electron/
 │   ├── main.js                    # Electron ana süreç (pencere, ikon, CSP, GitHub güncelleme kontrolü)
-│   ├── preload.cjs                # Preload script (contextBridge: fullscreen, güncelleme, harici URL, kasa yedeği, safeStorage)
+│   ├── preload.cjs                # Preload script (contextBridge: fullscreen, güncelleme, harici URL, kasa yedeği, safeStorage, pano)
 │   ├── backups.js                 # Kasa yedeği adı ve doğrulama (saf fonksiyonlar, test edilir)
+│   ├── secretClipboard.js         # Şifre kopyalama + 30 sn sonra pano temizliği (ana süreç, test edilir)
 │   ├── __tests__/                 # Vitest testleri (exe'ye paketlenmez)
 │   └── setIcon.cjs                # afterPack hook (rcedit ile exe'ye ikon gömer)
 ├── scripts/
@@ -98,7 +99,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 - `getRandomIndex` fonksiyonunda **rejection sampling** ile modulo bias önlenir.
 - Fisher-Yates shuffle algoritması ile karıştır.
 - Her aktif karakter setinden en az 1 karakter garantile.
-- Pano kopyalamalarında `copyToClipboard()` kullan — 30 saniye sonra pano otomatik temizlenir.
+- Pano kopyalamalarında `copyToClipboard()` kullan — 30 saniye sonra pano otomatik temizlenir. Electron'da kopyalama ve temizlik ana süreçte yapılır (`clipboard:copy-secret` IPC, `electron/secretClipboard.js`): pencere odakta olmasa da çalışır, uygulama kapanırken (`will-quit`) bekleyen şifre de silinir. Panoda artık başka bir metin varsa dokunulmaz. Renderer'daki `navigator.clipboard` yolu yalnızca web modu içindir (odak dışındayken çalışmaz).
 - Kasa verileri AES-GCM ile şifrelenir, anahtar PBKDF2 (SHA-256, 600.000 iterasyon) ile türetilir.
 - **Ana şifre bellekte tutulmaz:** kilit açılışında (veya kurulumda) anahtar bir kez türetilir ve `useSavedPasswords` içinde dışa aktarılamaz (`extractable: false`) `CryptoKey` olarak tutulur (`vaultKeyRef = { key, salt }`). Kilitlenince silinir. Yazmalar `encryptWithKey` ile yapılır: kasa salt'ı sabit, IV her yazmada yeni.
 - Şifreli blob biçimi değişmez: `base64(salt[16] | iv[12] | ciphertext)`. Kasa, otomatik yedekler ve `.passgen` dosyaları ana şifreyle `decrypt(data, password)` ile açılır. Kilit açma GCM doğrulamasına dayanır; `passwordHash` / `hashSalt` yalnızca eski sürümlerle uyumluluk için yazılır.

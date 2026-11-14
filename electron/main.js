@@ -1,9 +1,13 @@
-import { app, BrowserWindow, ipcMain, session, net, shell, safeStorage } from 'electron'
+import { app, BrowserWindow, ipcMain, session, net, shell, safeStorage, clipboard } from 'electron'
 import { Buffer } from 'buffer'
 import { join } from 'path'
 import { readFileSync } from 'fs'
 import { mkdir } from 'fs/promises'
 import { BACKUP_DIR_NAME, writeBackupFile } from './backups.js'
+import { createSecretClipboard } from './secretClipboard.js'
+
+// Kopyalanan şifreler 30 sn sonra panodan silinir; pencere odakta olmasa da çalışır
+const secretClipboard = createSecretClipboard({ clipboard })
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -175,6 +179,9 @@ app.whenReady().then(() => {
     }
   })
 
+  // IPC: şifreyi panoya kopyala, 30 sn sonra (hâlâ panodaysa) sil
+  ipcMain.handle('clipboard:copy-secret', (_, text) => secretClipboard.copy(text))
+
   // IPC: geçmiş gibi verileri diske düz metin yazmadan saklamak için (safeStorage)
   ipcMain.handle('secure:protect', (_, text) => protectText(text))
   ipcMain.handle('secure:unprotect', (_, encoded) => unprotectText(encoded))
@@ -197,6 +204,11 @@ app.whenReady().then(() => {
 
   // 5sn sonra güncelleme kontrolü (başlangıç hızını etkilememek için)
   setTimeout(() => checkForUpdates(), 5000)
+})
+
+// Uygulama 30 sn dolmadan kapanırsa kopyalanan şifre panoda kalmasın
+app.on('will-quit', () => {
+  secretClipboard.clearNow()
 })
 
 app.on('window-all-closed', () => {

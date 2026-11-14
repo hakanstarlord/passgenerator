@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   backupVault: (json) => ipcRenderer.invoke('vault:backup', json),
   openBackupFolder: () => ipcRenderer.invoke('vault:open-backups'),
+  copySecret: (text) => ipcRenderer.invoke('clipboard:copy-secret', text),
   protectText: (text) => ipcRenderer.invoke('secure:protect', text),
   unprotectText: (encoded) => ipcRenderer.invoke('secure:unprotect', encoded),
 })
