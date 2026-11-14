@@ -98,7 +98,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 ## Veri Akışı
 
 - State `App.jsx`'te tutulur, child bileşenlere prop olarak geçilir.
-- `GeneratorPanel` → `onGenerate` callback ile geçmişe yazar. Kasaya kaydedilen şifreler geçmişe eklenmez.
+- `GeneratorPanel` → `onGenerate` callback ile geçmişe yazar. Kasaya kaydedilen şifreler geçmişe eklenmez. Sonuç kartındaki "Kasaya kaydet" (`VaultEntryForm`) ile sonradan kaydedilen şifrenin geçmişteki karşılığı `onRemoveFromHistory(historyId)` ile kaldırılır (şifre formda değiştirilmediyse). Kasa kurulmamışsa veya kilitliyse buton kapalıdır (`isVaultInitialized`, `isVaultLocked`).
 - `HistoryPanel` → `removeFromHistory`, `clearHistory` prop'larını alır.
 - Kasa kaydı alanları: `id`, `name`, `password`, `category`, `date`, `strength`, `length`, `charTypes` ve isteğe bağlı `username`, `url`, `notes` (boşsa hiç tutulmaz). Elle ekleme ve düzenleme `VaultEntryForm` ile yapılır; kayıt `normalizeVaultEntry`'den geçer (güç, uzunluk, karakter türleri şifreden hesaplanır). Not, şifre gösterildiğinde görünür.
 - `VaultPanel` → `savePasswords`, `unlock`, `lock`, `setupMasterPassword`, `removePassword`, `restorePassword`, `updatePassword`, `importPasswords`, `exportPasswords`, `changeMasterPassword`, `clearAll` prop'larını alır. Ana şifre hiçbir bileşene verilmez.

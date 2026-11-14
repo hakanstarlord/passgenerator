@@ -1,8 +1,10 @@
 import { useState, useCallback } from 'react'
-import { Sparkles, Plus, Minus, Copy, Check, ClipboardList, Landmark, Wifi, AtSign, Mail, Hash, AlertTriangle, Shield } from 'lucide-react'
+import { Sparkles, Plus, Minus, Copy, Check, ClipboardList, Landmark, Wifi, AtSign, Mail, Hash, AlertTriangle, Shield, Save } from 'lucide-react'
+import VaultEntryForm from './VaultEntryForm'
 import { generatePassword, calculateStrength, calculateEntropy } from './utils/passwordGenerator'
 import { copyToClipboard } from './utils/clipboard'
 import { findDuplicatePassword } from './utils/duplicateCheck'
+import { normalizeVaultEntry } from './utils/vaultEntry'
 import { CATEGORIES } from './utils/categories'
 
 const charOptions = [
@@ -43,7 +45,7 @@ function ToggleSwitch({ enabled, onChange, disabled }) {
   )
 }
 
-function PasswordCard({ value, strength, entropy, index }) {
+function PasswordCard({ value, strength, entropy, index, saved, isSaving, saveDisabledReason, onSave }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = useCallback(async () => {
@@ -74,6 +76,31 @@ function PasswordCard({ value, strength, entropy, index }) {
         >
           {copied ? <Check size={16} /> : <Copy size={16} />}
         </button>
+        {saved ? (
+          <span
+            className="shrink-0 flex items-center gap-1 px-2.5 py-2 rounded-lg bg-green-500/10 text-green-400 text-xs font-medium"
+            title="Bu şifre kasaya kaydedildi"
+          >
+            <Check size={14} />
+            Kasada
+          </span>
+        ) : (
+          // Kapalı butonlarda ipucu her tarayıcıda görünmediği için title sarmalayıcıda
+          <span className="shrink-0" title={saveDisabledReason || 'Kasaya kaydet'}>
+            <button
+              onClick={onSave}
+              disabled={!!saveDisabledReason}
+              className={`p-2.5 rounded-lg transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed ${
+                isSaving
+                  ? 'bg-indigo-500/20 text-indigo-400'
+                  : 'bg-white/5 text-gray-400 enabled:hover:bg-indigo-500/20 enabled:hover:text-indigo-400'
+              }`}
+              aria-label="Kasaya kaydet"
+            >
+              <Save size={16} />
+            </button>
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-3">
@@ -110,7 +137,7 @@ function PasswordCard({ value, strength, entropy, index }) {
   )
 }
 
-export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocked, savedPasswords }) {
+export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocked, isVaultInitialized, savedPasswords, onRemoveFromHistory }) {
   const [length, setLength] = useState(16)
   const [count, setCount] = useState(1)
   const [charTypes, setCharTypes] = useState({
@@ -129,7 +156,15 @@ export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocke
   const [isSavingToVault, setIsSavingToVault] = useState(false)
   const [duplicateWarning, setDuplicateWarning] = useState(null)
   const [pendingVaultEntries, setPendingVaultEntries] = useState(null)
+  // Kasaya kaydet formu açık olan sonuç kartının sırası
+  const [savingIndex, setSavingIndex] = useState(null)
   const activeCount = Object.values(charTypes).filter(Boolean).length
+
+  const saveDisabledReason = !isVaultInitialized
+    ? 'Önce Kasa sekmesinden kasa oluşturun.'
+    : isVaultLocked
+      ? 'Kasa kilitli — kaydetmek için önce kasanın kilidini açın.'
+      : null
 
   const activeProfile = PRESET_PROFILES.find((p) =>
     p.length === length &&
@@ -168,29 +203,62 @@ export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocke
     setTimeout(() => setSavedToVault(false), 2000)
     setVaultName('')
     setVaultCategory('other')
+    const savedValues = new Set(entries.map((entry) => entry.password))
+    setPasswords((prev) => prev.map((pw) => (savedValues.has(pw.value) ? { ...pw, savedToVault: true } : pw)))
+  }
+
+  // Sonuç kartından kasaya kaydetme. Kaydedilen şifre geçmişte görünmez (CLAUDE.md):
+  // şifre değiştirilmeden kaydedildiyse geçmişteki karşılığı kaldırılır (kasada saklandığı için kaybolmaz).
+  async function handleSaveCard(index, values) {
+    const item = passwords[index]
+    const unchanged = values.password === item.value
+    const entry = normalizeVaultEntry({
+      ...values,
+      charTypes: unchanged ? item.charTypes : undefined,
+      id: crypto.randomUUID(),
+      date: new Date().toISOString(),
+    })
+    if (!entry) return false
+    const saved = await onSaveToVault?.([entry])
+    if (!saved) return false
+    if (unchanged) {
+      setPasswords((prev) => prev.map((pw, i) => (i === index ? { ...pw, savedToVault: true } : pw)))
+      if (item.historyId) onRemoveFromHistory?.(item.historyId)
+    }
+    setSavingIndex(null)
+    return true
   }
 
   function handleGenerate() {
     const entropy = calculateEntropy(length, charTypes)
+    const typesUsed = { ...charTypes }
+    const savingToVault = vaultName.trim() && !isVaultLocked
     const generated = Array.from({ length: count }, () => {
       const value = generatePassword(length, charTypes)
       const strength = calculateStrength(value)
-      return { value, strength, entropy }
+      return {
+        value,
+        strength,
+        entropy,
+        charTypes: typesUsed,
+        // Geçmişe eklenen şifrenin kaydı; karttan kasaya kaydedilirse geçmişten kaldırmak için
+        historyId: savingToVault ? null : crypto.randomUUID(),
+        savedToVault: false,
+      }
     })
     setPasswords(generated)
+    setSavingIndex(null)
     setCopiedAll(false)
-
-    const savingToVault = vaultName.trim() && !isVaultLocked
 
     // Kasaya kaydedilen şifreleri geçmişe ekleme
     if (!savingToVault) {
       const historyEntries = generated.map((pw) => ({
-        id: crypto.randomUUID(),
+        id: pw.historyId,
         password: pw.value,
         strength: pw.strength,
         length,
         date: new Date().toISOString(),
-        charTypes: { ...charTypes },
+        charTypes: { ...typesUsed },
       }))
       onGenerate?.(historyEntries)
     }
@@ -465,13 +533,28 @@ export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocke
 
           <div className="space-y-3">
             {passwords.map((pw, i) => (
-              <PasswordCard
-                key={`${pw.value}-${i}`}
-                value={pw.value}
-                strength={pw.strength}
-                entropy={pw.entropy}
-                index={i}
-              />
+              <div key={`${pw.value}-${i}`} className="space-y-2">
+                <PasswordCard
+                  value={pw.value}
+                  strength={pw.strength}
+                  entropy={pw.entropy}
+                  index={i}
+                  saved={pw.savedToVault}
+                  isSaving={savingIndex === i}
+                  saveDisabledReason={saveDisabledReason}
+                  onSave={() => setSavingIndex(savingIndex === i ? null : i)}
+                />
+                {savingIndex === i && !saveDisabledReason && (
+                  <VaultEntryForm
+                    initial={{ password: pw.value }}
+                    title="Kasaya Kaydet"
+                    submitLabel="Kasaya Kaydet"
+                    onSubmit={(values) => handleSaveCard(i, values)}
+                    onCancel={() => setSavingIndex(null)}
+                    savedPasswords={savedPasswords}
+                  />
+                )}
+              </div>
             ))}
           </div>
         </section>

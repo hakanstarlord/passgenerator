@@ -137,7 +137,9 @@ function App() {
               onGenerate={addToHistory}
               onSaveToVault={savePasswords}
               isVaultLocked={isLocked}
+              isVaultInitialized={isInitialized}
               savedPasswords={savedPasswords}
+              onRemoveFromHistory={removeFromHistory}
             />
           )}
           {activeTab === 'vault' && (
