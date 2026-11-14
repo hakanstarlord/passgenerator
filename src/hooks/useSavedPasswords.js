@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { encrypt, decrypt, hashPassword } from '../utils/crypto'
 import { calculateStrength } from '../utils/passwordGenerator'
 import { normalizeCategory } from '../utils/categories'
+import { saveAutoBackup } from '../utils/exportImport'
 
 const STORAGE_KEY = 'passgen_vault'
 const BACKUP_KEY = 'passgen_vault_backup'
@@ -43,6 +44,8 @@ export default function useSavedPasswords() {
       hashSalt: stored?.hashSalt,
       data
     }))
+    // Kasa yazıldıktan sonra her sürüm ayrı bir dosyaya yedeklenir (beklenmez)
+    saveAutoBackup(data, passwords.length)
   }, [])
 
   // Değişikliği sıraya ekler. `updater` bir önceki yazma bittikten sonra, kasadaki
@@ -92,6 +95,7 @@ export default function useSavedPasswords() {
       hashSalt: saltB64,
       data
     }))
+    saveAutoBackup(data, initialPasswords.length)
 
     // Migrasyon başarılı — yedek temizle
     if (needsMigration) {

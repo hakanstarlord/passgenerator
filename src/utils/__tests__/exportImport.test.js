@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { parseImportFile } from '../exportImport'
+import { parseImportFile, decryptImportData, buildExportFile } from '../exportImport'
+import { encrypt } from '../crypto'
 
 function createFile(content) {
   return {
@@ -40,5 +41,27 @@ describe('parseImportFile', () => {
     const sameVersion = { format: 'passgen', version: 1, count: 0, data: 'test' }
     const result = await parseImportFile(createFile(sameVersion))
     expect(result.version).toBe(1)
+  })
+})
+
+describe('buildExportFile', () => {
+  it('kasa verisinden içe aktarılabilir .passgen dosyası üretir', async () => {
+    const passwords = [
+      { id: '1', name: 'Banka', password: 'Şifre-123!', category: 'bank' },
+      { id: '2', name: 'E-posta', password: 'xY9#kL2$', category: 'email' },
+    ]
+    const masterPassword = 'anaŞifre-Test-2026!'
+    const encrypted = await encrypt(JSON.stringify(passwords), masterPassword)
+
+    const parsed = await parseImportFile(createFile(buildExportFile(encrypted, passwords.length)))
+    expect(parsed.format).toBe('passgen')
+    expect(parsed.count).toBe(2)
+    expect(await decryptImportData(parsed, masterPassword)).toEqual(passwords)
+  })
+
+  it('yanlış ana şifreyle açılmaz', async () => {
+    const encrypted = await encrypt(JSON.stringify([{ id: '1', password: 'x' }]), 'doğruŞifre')
+    const parsed = await parseImportFile(createFile(buildExportFile(encrypted, 1)))
+    await expect(decryptImportData(parsed, 'yanlışŞifre')).rejects.toThrow('Şifre yanlış veya dosya bozuk.')
   })
 })

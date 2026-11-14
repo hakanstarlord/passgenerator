@@ -46,6 +46,7 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "!electron/__tests__/**",
       "build/icon.ico"
     ],
     "afterPack": "electron/setIcon.cjs",

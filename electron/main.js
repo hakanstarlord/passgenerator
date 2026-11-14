@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain, session, net, shell } from 'electron'
 import { join } from 'path'
 import { readFileSync } from 'fs'
+import { mkdir } from 'fs/promises'
+import { BACKUP_DIR_NAME, writeBackupFile } from './backups.js'
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -119,6 +121,10 @@ function compareVersions(a, b) {
   return 0
 }
 
+function getBackupDir() {
+  return join(app.getPath('userData'), BACKUP_DIR_NAME)
+}
+
 app.whenReady().then(() => {
   // CSP header injection
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -134,6 +140,23 @@ app.whenReady().then(() => {
 
   // IPC: güncelleme kontrolü
   ipcMain.handle('check-for-updates', () => checkForUpdates())
+
+  // IPC: otomatik kasa yedeği (yol ve dosya adı yalnızca burada belirlenir)
+  // Var olan hiçbir yedeğin üzerine yazılmaz ve hiçbir yedek silinmez
+  ipcMain.handle('vault:backup', async (_, json) => {
+    try {
+      return (await writeBackupFile(getBackupDir(), json)) !== null
+    } catch {
+      return false
+    }
+  })
+
+  // IPC: yedek klasörünü dosya gezgininde aç
+  ipcMain.handle('vault:open-backups', async () => {
+    const dir = getBackupDir()
+    await mkdir(dir, { recursive: true })
+    return (await shell.openPath(dir)) === ''
+  })
 
   // IPC: harici URL aç (sadece GitHub)
   ipcMain.handle('open-external', (_, url) => {

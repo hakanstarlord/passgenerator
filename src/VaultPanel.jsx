@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { Copy, Check, Trash2, Eye, EyeOff, Search, AlertTriangle, Lock, Unlock, KeyRound, ShieldAlert, Pencil, X, Download, Upload, Timer, Shield, Users, Landmark, Mail, ShoppingBag, Gamepad2, Briefcase, Tag, Undo2 } from 'lucide-react'
+import { Copy, Check, Trash2, Eye, EyeOff, Search, AlertTriangle, Lock, Unlock, KeyRound, ShieldAlert, Pencil, X, Download, Upload, FolderOpen, Timer, Shield, Users, Landmark, Mail, ShoppingBag, Gamepad2, Briefcase, Tag, Undo2 } from 'lucide-react'
 import { copyToClipboard } from './utils/clipboard'
 import { calculateStrength, calculateEntropy } from './utils/passwordGenerator'
 import { exportVault, parseImportFile, decryptImportData } from './utils/exportImport'
@@ -443,6 +443,8 @@ function ImportModal({ onImport, onClose, savedPasswords }) {
   const [loading, setLoading] = useState(false)
   const [replaceConfirm, setReplaceConfirm] = useState(false)
   const fileInputRef = useRef(null)
+  // Otomatik yedekler yalnızca masaüstü uygulamasında yazılır
+  const canOpenBackups = !!window.electronAPI?.openBackupFolder
 
   async function handleFileSelect(e) {
     const file = e.target.files?.[0]
@@ -516,6 +518,23 @@ function ImportModal({ onImport, onClose, savedPasswords }) {
               <Upload size={16} />
               Dosya Seç
             </button>
+            {canOpenBackups && (
+              <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-3 space-y-2">
+                <p className="text-xs text-gray-400">
+                  Kasa her değişiklikte otomatik olarak yedeklenir ve yedekler hiç silinmez.
+                  Geri yüklemek için yedek klasöründen bir dosya seçin; şifresi ana şifrenizdir.
+                  Kasayı tamamen o ana döndürmek için &quot;Değiştir&quot; modunu kullanın.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => window.electronAPI.openBackupFolder()}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white transition-all"
+                >
+                  <FolderOpen size={14} />
+                  Yedek Klasörünü Aç
+                </button>
+              </div>
+            )}
             {error && <p className="text-xs text-red-400">{error}</p>}
           </div>
         )}

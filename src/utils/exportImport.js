@@ -2,21 +2,38 @@ import { encrypt, decrypt } from './crypto'
 
 const EXPORT_VERSION = 1
 
+// Şifreli kasa verisinden İçe Aktar'ın okuyabildiği .passgen dosya içeriğini üretir.
+// Kasadaki `data` alanı ile dışa aktarmadaki `data` aynı formattadır.
+export function buildExportFile(encryptedData, count) {
+  return JSON.stringify({
+    format: 'passgen',
+    version: EXPORT_VERSION,
+    exportDate: new Date().toISOString(),
+    count,
+    data: encryptedData,
+  }, null, 2)
+}
+
 export async function exportVault(passwords, masterPassword) {
   const plaintext = JSON.stringify(passwords)
   const encryptedData = await encrypt(plaintext, masterPassword)
 
-  const exportData = {
-    format: 'passgen',
-    version: EXPORT_VERSION,
-    exportDate: new Date().toISOString(),
-    count: passwords.length,
-    data: encryptedData,
-  }
-
-  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+  const blob = new Blob([buildExportFile(encryptedData, passwords.length)], { type: 'application/json' })
   const filename = `passgen-yedek-${new Date().toISOString().slice(0, 10)}.passgen`
   downloadFile(blob, filename)
+}
+
+// Electron'da kasanın şifreli halini otomatik yedek olarak yazdırır (yedekler hiç silinmez).
+// Web modunda yapılacak bir şey yoktur; yedek hatası kasa yazmasını etkilemez.
+export function saveAutoBackup(encryptedData, count) {
+  const backupVault = typeof window === 'undefined' ? undefined : window.electronAPI?.backupVault
+  if (!backupVault) return
+  Promise.resolve()
+    .then(() => backupVault(buildExportFile(encryptedData, count)))
+    .then((ok) => {
+      if (!ok) console.warn('Kasa yedeği yazılamadı.')
+    })
+    .catch((err) => console.warn('Kasa yedeği yazılamadı:', err))
 }
 
 function downloadFile(blob, filename) {

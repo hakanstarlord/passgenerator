@@ -18,6 +18,7 @@ Güvenli ve kullanımı kolay masaüstü şifre üretici uygulaması.
 - **Pano güvenliği** — Kopyalanan şifreler 30 saniye sonra panodan otomatik temizlenir
 - **Koyu tema** — Göz yormayan karanlık arayüz
 - **Masaüstü uygulaması** — Electron ile Windows portable exe olarak dağıtılabilir
+- **Otomatik yedek** — Masaüstü uygulamasında kasa her değişiklikte şifreli bir `.passgen` dosyası olarak `%APPDATA%\password-generator\yedekler` klasörüne yedeklenir. Yedekler hiç silinmez; geri yüklemek için İçe Aktar'dan bir yedek seçilir
 - **Electron güvenliği** — CSP header, sandbox, dış navigasyon engeli
 
 ## Hızlı Başlangıç

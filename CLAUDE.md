@@ -24,7 +24,9 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 │   └── icon.ico                   # Windows ikonu (exe'ye gömülür, rcedit ile)
 ├── electron/
 │   ├── main.js                    # Electron ana süreç (pencere, ikon, CSP, GitHub güncelleme kontrolü)
-│   ├── preload.cjs                # Preload script (contextBridge: fullscreen, güncelleme, harici URL)
+│   ├── preload.cjs                # Preload script (contextBridge: fullscreen, güncelleme, harici URL, kasa yedeği)
+│   ├── backups.js                 # Kasa yedeği adı ve doğrulama (saf fonksiyonlar, test edilir)
+│   ├── __tests__/                 # Vitest testleri (exe'ye paketlenmez)
 │   └── setIcon.cjs                # afterPack hook (rcedit ile exe'ye ikon gömer)
 ├── scripts/
 │   └── watch-build.mjs            # Değişiklikte exe'yi yeniden derler (npm run electron:watch)
@@ -102,6 +104,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 - Kasaya kaydetmeden önce duplikasyon kontrolü yapılır.
 - Dışa aktarma: kasa verileri master şifreyle şifreli `.passgen` dosyası olarak indirilir.
 - İçe aktarma: `.passgen` dosyası şifre çözülerek önizlenir, birleştir/değiştir modları desteklenir.
+- Otomatik yedek (yalnızca Electron): her başarılı kasa yazmasından sonra şifreli `.passgen` yedeği `%APPDATA%\password-generator\yedekler` klasörüne **yeni bir dosya** olarak yazılır (`saveAutoBackup` → `vault:backup` IPC → `electron/backups.js`). Yedekler **asla silinmez, döndürülmez, üzerine yazılmaz** (`wx` bayrağı). Geri yükleme İçe Aktar ile yapılır; İçe Aktar penceresinde "Yedek Klasörünü Aç" butonu vardır.
 
 ## Güçlük Hesaplama
 
@@ -152,6 +155,7 @@ npm run electron:watch # Değişiklikte exe'yi otomatik yeniden derle
 6. **Bileşen dosyalarını gereksiz bölme:** Küçük yardımcı bileşenler ana dosyada kalabilir.
 7. **İngilizce UI metni yazma:** Tüm kullanıcıya görünen metinler Türkçe olmalı.
 8. **`vite.config.js`'de `base: './'` silme:** Electron'da dosya yollarının çalışması için gerekli.
+11. **Kayıtlı şifreleri veya yedeklerini otomatik silme:** Yedekleri temizleyen, budayan, döndüren veya üzerine yazan kod ekleme; sayı/süre sınırlı saklama kuralı önerme. Kullanıcı kuralı: kayıtlı şifreler kesinlikle silinmemeli. Disk kullanımı kaygısı varsa bilgi ver, temizliği kullanıcıya bırak.
 
 ## Yeni Özellik Eklerken
 
