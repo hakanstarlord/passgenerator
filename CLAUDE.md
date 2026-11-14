@@ -62,6 +62,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 │       ├── crypto.js              # AES-GCM şifreleme/çözme, PBKDF2 anahtar türetme
 │       ├── duplicateCheck.js      # Aynı şifre uyarısı, birebir aynı kayıt (entryKey) ve birleştirme
 │       ├── csvImport.js           # Chrome/Edge/Firefox şifre CSV'sini ayrıştırır
+│       ├── vaultHealth.js         # Şifre sağlığı: zayıf, tekrar eden, eski (analyzeVaultHealth)
 │       ├── exportImport.js        # Kasa dışa/içe aktarma (.passgen dosya formatı)
 │       ├── categories.js          # Kasa kategorileri (etiket, ikon, normalizeCategory)
 │       ├── vaultEntry.js          # normalizeVaultEntry: eksik alanları şifreden tamamlar
@@ -100,7 +101,8 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 - State `App.jsx`'te tutulur, child bileşenlere prop olarak geçilir.
 - `GeneratorPanel` → `onGenerate` callback ile geçmişe yazar. Kasaya kaydedilen şifreler geçmişe eklenmez. Sonuç kartındaki "Kasaya kaydet" (`VaultEntryForm`) ile sonradan kaydedilen şifrenin geçmişteki karşılığı `onRemoveFromHistory(historyId)` ile kaldırılır (şifre formda değiştirilmediyse). Kasa kurulmamışsa veya kilitliyse buton kapalıdır (`isVaultInitialized`, `isVaultLocked`).
 - `HistoryPanel` → `removeFromHistory`, `clearHistory` prop'larını alır.
-- Kasa kaydı alanları: `id`, `name`, `password`, `category`, `date`, `strength`, `length`, `charTypes` ve isteğe bağlı `username`, `url`, `notes` (boşsa hiç tutulmaz). Elle ekleme ve düzenleme `VaultEntryForm` ile yapılır; kayıt `normalizeVaultEntry`'den geçer (güç, uzunluk, karakter türleri şifreden hesaplanır). Not, şifre gösterildiğinde görünür.
+- Kasa kaydı alanları: `id`, `name`, `password`, `category`, `date`, `strength`, `length`, `charTypes` ve isteğe bağlı `username`, `url`, `notes` (boşsa hiç tutulmaz) ile `passwordChangedAt` (şifre düzenlemede değişince yazılır; Firefox CSV'sinden `timePasswordChanged` ile gelir; yoksa yaş `date`'ten hesaplanır).
+- Şifre sağlığı (`analyzeVaultHealth`, Kasa ekranında özet + filtre + rozet): zayıf = güç skoru ≤ 1; tekrar eden = aynı şifre ≥ 2 kayıtta; eski = şifre 365 günden uzun süredir değişmemiş. Ana şifre değiştirme `passwordChangedAt`'e dokunmaz. Elle ekleme ve düzenleme `VaultEntryForm` ile yapılır; kayıt `normalizeVaultEntry`'den geçer (güç, uzunluk, karakter türleri şifreden hesaplanır). Not, şifre gösterildiğinde görünür.
 - `VaultPanel` → `savePasswords`, `unlock`, `lock`, `setupMasterPassword`, `removePassword`, `restorePassword`, `updatePassword`, `importPasswords`, `exportPasswords`, `changeMasterPassword`, `clearAll` prop'larını alır. Ana şifre hiçbir bileşene verilmez.
 - `GeneratorPanel` → `savedPasswords` prop'u ile duplikasyon kontrolü yapar. Kasaya `onSaveToVault(entries)` ile tek seferde toplu yazar ve sonucu bekler.
 - **Kasa yazmaları sıralıdır:** `useSavedPasswords` içindeki her değişiklik `mutate(prev => next)` ile sıraya alınır. Yeni kasa işlemi eklerken `next` listesini `savedPasswords` state'inden hesaplama — art arda çağrılarda eski liste kullanılır ve kayıtlar kaybolur.

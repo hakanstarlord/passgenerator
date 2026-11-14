@@ -1,9 +1,17 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { Copy, Check, Trash2, Eye, EyeOff, Search, AlertTriangle, Lock, Unlock, KeyRound, ShieldAlert, Pencil, X, Download, Upload, FolderOpen, Timer, Shield, Users, Landmark, Mail, ShoppingBag, Gamepad2, Briefcase, Tag, Undo2, User, Globe, ExternalLink, StickyNote, Plus } from 'lucide-react'
+import { Copy, Check, Trash2, Eye, EyeOff, Search, AlertTriangle, Lock, Unlock, KeyRound, ShieldAlert, Pencil, X, Download, Upload, FolderOpen, Timer, Shield, Users, Landmark, Mail, ShoppingBag, Gamepad2, Briefcase, Tag, Undo2, User, Globe, ExternalLink, StickyNote, Plus, HeartPulse } from 'lucide-react'
 import VaultEntryForm from './VaultEntryForm'
 import { copyToClipboard } from './utils/clipboard'
 import { openSite, toSiteUrl } from './utils/siteUrl'
 import { csvToEntries } from './utils/csvImport'
+import { analyzeVaultHealth, matchesHealthFilter, formatAge } from './utils/vaultHealth'
+
+// Sağlık özeti etiketleri (Kasa ekranı)
+const HEALTH_FILTERS = [
+  { id: 'weak', label: 'Zayıf', active: 'bg-red-500/20 text-red-400 border-red-500/50', idle: 'bg-red-500/5 text-red-400/80 border-red-500/20 hover:bg-red-500/10' },
+  { id: 'reused', label: 'Tekrar eden', active: 'bg-orange-500/20 text-orange-400 border-orange-500/50', idle: 'bg-orange-500/5 text-orange-400/80 border-orange-500/20 hover:bg-orange-500/10' },
+  { id: 'old', label: 'Eski', active: 'bg-white/15 text-gray-200 border-white/30', idle: 'bg-white/[0.03] text-gray-400 border-white/[0.08] hover:bg-white/[0.06]' },
+]
 import { calculateStrength, calculateEntropy } from './utils/passwordGenerator'
 import { parseImportFile, decryptImportData } from './utils/exportImport'
 import { flagDuplicateEntries } from './utils/duplicateCheck'
@@ -35,7 +43,7 @@ const charTypeLabels = {
   symbols: '#!@',
 }
 
-function VaultRow({ item, onRemove, isEditing, onStartEdit, onCancelEdit, onSaveEdit, savedPasswords }) {
+function VaultRow({ item, health, onRemove, isEditing, onStartEdit, onCancelEdit, onSaveEdit, savedPasswords }) {
   const [visible, setVisible] = useState(false)
   const [copied, setCopied] = useState(false)
   const [usernameCopied, setUsernameCopied] = useState(false)
@@ -190,6 +198,17 @@ function VaultRow({ item, onRemove, isEditing, onStartEdit, onCancelEdit, onSave
           <span className="flex items-center gap-1 text-xs text-gray-500 font-mono">
             <Shield size={12} className="text-gray-600" />
             ~{calculateEntropy(item.length, item.charTypes)} bit
+          </span>
+        )}
+        {/* Sağlık rozetleri (zayıflık, güç etiketinde zaten görünüyor) */}
+        {health?.reuseCount > 1 && (
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400" title="Aynı şifre birden fazla kayıtta kullanılıyor">
+            {health.reuseCount} kayıtta aynı
+          </span>
+        )}
+        {health?.old && (
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/5 text-gray-400" title="Şifre uzun süredir değiştirilmedi">
+            {formatAge(health.ageDays)} değişmedi
           </span>
         )}
         {item.notes && !visible && (
@@ -813,6 +832,7 @@ export default function VaultPanel({
 }) {
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [healthFilter, setHealthFilter] = useState(null)
   const [showConfirm, setShowConfirm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [isAdding, setIsAdding] = useState(false)
@@ -845,13 +865,19 @@ export default function VaultPanel({
     return <LockedView onUnlock={unlock} />
   }
 
+  // Şifre sağlığı: zayıf, tekrar eden, eski. Sorunu kalmayan filtre kendiliğinden kalkar.
+  const health = analyzeVaultHealth(passwords)
+  const activeHealthFilter = healthFilter && health.counts[healthFilter] > 0 ? healthFilter : null
+  const healthIssueCount = health.counts.weak + health.counts.reused + health.counts.old
+
   // Arama ad, kullanıcı adı ve sitede yapılır (Türkçe büyük/küçük harf kurallarıyla)
   const query = search.trim().toLocaleLowerCase('tr')
   const filtered = passwords.filter((item) => {
     const matchesSearch = !query || [item.name, item.username, item.url]
       .some((value) => value && value.toLocaleLowerCase('tr').includes(query))
     const matchesCategory = categoryFilter === 'all' || (item.category || 'other') === categoryFilter
-    return matchesSearch && matchesCategory
+    const matchesHealth = matchesHealthFilter(health.byId.get(item.id), activeHealthFilter)
+    return matchesSearch && matchesCategory && matchesHealth
   })
 
   const categoryCounts = passwords.reduce((acc, item) => {
@@ -1063,6 +1089,35 @@ export default function VaultPanel({
 
       {addSection}
 
+      <div className="flex items-center gap-1.5 mb-3 flex-wrap text-xs">
+        <span className="flex items-center gap-1 text-gray-500 mr-1">
+          <HeartPulse size={13} />
+          Şifre sağlığı:
+        </span>
+        {healthIssueCount === 0 ? (
+          <span className="flex items-center gap-1 text-green-400">
+            <Check size={12} />
+            sorun yok
+          </span>
+        ) : (
+          HEALTH_FILTERS.map((filter) => {
+            const count = health.counts[filter.id]
+            if (count === 0) return null
+            const isActive = activeHealthFilter === filter.id
+            return (
+              <button
+                key={filter.id}
+                onClick={() => setHealthFilter(isActive ? null : filter.id)}
+                className={`px-2.5 py-1 rounded-lg font-medium border transition-all ${isActive ? filter.active : filter.idle}`}
+                title={isActive ? 'Filtreyi kaldır' : `Yalnızca ${filter.label.toLocaleLowerCase('tr')} şifreleri göster`}
+              >
+                {filter.label} ({count})
+              </button>
+            )
+          })
+        )}
+      </div>
+
       <div className="relative mb-3">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
         <input
@@ -1116,6 +1171,7 @@ export default function VaultPanel({
             <VaultRow
               key={item.id}
               item={item}
+              health={health.byId.get(item.id)}
               onRemove={handleSoftDelete}
               isEditing={editingId === item.id}
               onStartEdit={(id) => { setEditingId(id); setIsAdding(false) }}

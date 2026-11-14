@@ -8,6 +8,15 @@ const COLUMN_ALIASES = {
   username: ['username', 'login_username', 'user', 'email'],
   password: ['password', 'login_password'],
   notes: ['note', 'notes', 'extra'],
+  // Firefox: şifrenin son değiştiği an (Unix ms)
+  passwordChangedAt: ['timepasswordchanged'],
+}
+
+function toChangedAt(value) {
+  const text = value.trim()
+  if (!/^\d+$/.test(text)) return null
+  const date = new Date(Number(text))
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
 // RFC 4180 CSV ayrıştırıcı: tırnaklı alanlar, "" kaçışı, alan içinde virgül ve satır sonu, CRLF/LF, BOM.
@@ -83,7 +92,7 @@ export function csvToEntries(text) {
     const get = (field) => (columns[field] === undefined ? '' : (cells[columns[field]] ?? ''))
     const url = get('url').trim()
     const username = get('username').trim()
-    return {
+    const entry = {
       name: get('name').trim() || nameFromUrl(url) || username,
       username,
       url,
@@ -91,5 +100,8 @@ export function csvToEntries(text) {
       notes: get('notes'),
       category: 'other',
     }
+    const changedAt = toChangedAt(get('passwordChangedAt'))
+    if (changedAt) entry.passwordChangedAt = changedAt
+    return entry
   })
 }

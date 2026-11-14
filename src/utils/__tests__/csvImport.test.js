@@ -77,3 +77,15 @@ describe('csvToEntries', () => {
     expect(() => csvToEntries('﻿\r\n')).toThrow('CSV dosyası boş.')
   })
 })
+
+describe('csvToEntries timePasswordChanged', () => {
+  it('Firefox şifre değişim zamanını passwordChangedAt olarak alır', () => {
+    const csv = '"url","username","password","timePasswordChanged"\n"https://ornek.com","ali","Sifre-1!","1700000000000"'
+    expect(csvToEntries(csv)[0].passwordChangedAt).toBe(new Date(1700000000000).toISOString())
+  })
+
+  it('sütun yoksa veya değer sayı değilse alanı eklemez', () => {
+    expect(csvToEntries('name,password\nA,p')[0]).not.toHaveProperty('passwordChangedAt')
+    expect(csvToEntries('url,password,timePasswordChanged\na.com,p,bilinmiyor')[0]).not.toHaveProperty('passwordChangedAt')
+  })
+})

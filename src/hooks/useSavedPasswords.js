@@ -176,8 +176,11 @@ export default function useSavedPasswords() {
     return mutate((prev) => prev.map(item => {
       if (item.id !== id) return item
       const merged = { ...item, ...updates }
-      // Şifre değiştiyse karakter türleri yeni şifreden yeniden hesaplanır
-      if (updates.password !== undefined && updates.password !== item.password) delete merged.charTypes
+      // Şifre değiştiyse karakter türleri yeniden hesaplanır ve değişim tarihi kaydedilir (sağlık: şifre yaşı)
+      if (updates.password !== undefined && updates.password !== item.password) {
+        delete merged.charTypes
+        merged.passwordChangedAt = new Date().toISOString()
+      }
       // Güç ve uzunluk şifreden türetilir; boşaltılan isteğe bağlı alanlar kaldırılır
       return normalizeVaultEntry(merged) ?? item
     }))

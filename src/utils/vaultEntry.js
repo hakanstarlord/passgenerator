@@ -50,6 +50,8 @@ export function normalizeVaultEntry(raw) {
     if (text.trim()) entry[field] = text
     else delete entry[field]
   }
+  // Şifrenin son değiştiği an (sağlık görünümünde yaş için); geçersizse tutulmaz
+  if ('passwordChangedAt' in entry && !isValidDate(entry.passwordChangedAt)) delete entry.passwordChangedAt
 
   return normalizeCategory({
     ...entry,

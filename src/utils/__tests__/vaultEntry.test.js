@@ -104,3 +104,14 @@ describe('normalizeVaultEntry isteğe bağlı alanlar', () => {
     expect(result).not.toHaveProperty('url')
   })
 })
+
+describe('normalizeVaultEntry passwordChangedAt', () => {
+  it('geçerli tarihi korur', () => {
+    expect(normalizeVaultEntry({ ...complete, passwordChangedAt: '2026-01-01T00:00:00.000Z' }).passwordChangedAt)
+      .toBe('2026-01-01T00:00:00.000Z')
+  })
+
+  it('geçersiz tarihi kaldırır', () => {
+    expect(normalizeVaultEntry({ ...complete, passwordChangedAt: 'dün' })).not.toHaveProperty('passwordChangedAt')
+  })
+})
