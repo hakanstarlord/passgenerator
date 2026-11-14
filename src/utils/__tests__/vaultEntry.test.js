@@ -71,3 +71,36 @@ describe('normalizeVaultEntry', () => {
     expect(result).not.toHaveProperty('duplicateName')
   })
 })
+
+describe('normalizeVaultEntry isteğe bağlı alanlar', () => {
+  it('kullanıcı adı, site ve notu korur; kullanıcı adı ve siteyi kırpar', () => {
+    const result = normalizeVaultEntry({ ...complete, username: '  ali@ornek.com ', url: ' ornek.com ', notes: '  kurtarma kodu: 1234\nikinci satır ' })
+    expect(result.username).toBe('ali@ornek.com')
+    expect(result.url).toBe('ornek.com')
+    expect(result.notes).toBe('  kurtarma kodu: 1234\nikinci satır ')
+  })
+
+  it('boş isteğe bağlı alanları kaldırır', () => {
+    const result = normalizeVaultEntry({ ...complete, username: '   ', url: '', notes: '\n ' })
+    expect(result).not.toHaveProperty('username')
+    expect(result).not.toHaveProperty('url')
+    expect(result).not.toHaveProperty('notes')
+  })
+
+  it('isteğe bağlı alanlar yoksa eklemez', () => {
+    const result = normalizeVaultEntry(complete)
+    expect(result).not.toHaveProperty('username')
+    expect(result).not.toHaveProperty('notes')
+  })
+
+  it('uzun notu kısaltmaz', () => {
+    const longNote = 'n'.repeat(10000)
+    expect(normalizeVaultEntry({ ...complete, notes: longNote }).notes).toHaveLength(10000)
+  })
+
+  it('sayı olan kullanıcı adını metne çevirir, nesneyi kaldırır', () => {
+    const result = normalizeVaultEntry({ ...complete, username: 12345, url: { a: 1 } })
+    expect(result.username).toBe('12345')
+    expect(result).not.toHaveProperty('url')
+  })
+})

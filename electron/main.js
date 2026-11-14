@@ -196,6 +196,19 @@ app.whenReady().then(() => {
     return (await shell.openPath(dir)) === ''
   })
 
+  // IPC: kasa kaydındaki siteyi varsayılan tarayıcıda aç (yalnızca http/https)
+  ipcMain.handle('site:open', async (_, url) => {
+    if (typeof url !== 'string' || url.length > 2000) return false
+    try {
+      const parsed = new URL(url)
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false
+      await shell.openExternal(parsed.href)
+      return true
+    } catch {
+      return false
+    }
+  })
+
   // IPC: harici URL aç (sadece GitHub)
   ipcMain.handle('open-external', (_, url) => {
     if (typeof url === 'string' && url.startsWith('https://github.com/')) {

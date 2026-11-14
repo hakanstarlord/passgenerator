@@ -47,6 +47,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 │   ├── GeneratorPanel.jsx         # Şifre üretim paneli
 │   ├── HistoryPanel.jsx           # Geçmiş paneli
 │   ├── VaultPanel.jsx             # Kasa paneli (kurulum/kilit/açık durumları)
+│   ├── VaultEntryForm.jsx         # Kasa kaydı formu (Yeni Kayıt ve düzenleme ortak)
 │   ├── main.jsx                   # React giriş noktası
 │   ├── index.css                  # Tailwind + özel animasyonlar
 │   ├── hooks/
@@ -66,6 +67,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 │       ├── masterPassword.js      # Ana şifre kuralı (getMasterPasswordProblem)
 │       ├── historyStorage.js      # Geçmişi safeStorage ile şifreli okur/yazar (düz metin yazmaz)
 │       ├── unlockRateLimit.js     # Kilit açma deneme sayacı (localStorage, 24 saat sıfırlama)
+│       ├── siteUrl.js             # Site alanını http/https adresine çevirir, tarayıcıda açar
 │       └── __tests__/             # Vitest birim testleri (utils/ için)
 ├── release/                       # Electron build çıktısı (git-ignore)
 ```
@@ -96,7 +98,8 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 - State `App.jsx`'te tutulur, child bileşenlere prop olarak geçilir.
 - `GeneratorPanel` → `onGenerate` callback ile geçmişe yazar. Kasaya kaydedilen şifreler geçmişe eklenmez.
 - `HistoryPanel` → `removeFromHistory`, `clearHistory` prop'larını alır.
-- `VaultPanel` → `unlock`, `lock`, `setupMasterPassword`, `removePassword`, `restorePassword`, `updatePassword`, `importPasswords`, `exportPasswords`, `clearAll` prop'larını alır. Ana şifre hiçbir bileşene verilmez.
+- Kasa kaydı alanları: `id`, `name`, `password`, `category`, `date`, `strength`, `length`, `charTypes` ve isteğe bağlı `username`, `url`, `notes` (boşsa hiç tutulmaz). Elle ekleme ve düzenleme `VaultEntryForm` ile yapılır; kayıt `normalizeVaultEntry`'den geçer (güç, uzunluk, karakter türleri şifreden hesaplanır). Not, şifre gösterildiğinde görünür.
+- `VaultPanel` → `savePasswords`, `unlock`, `lock`, `setupMasterPassword`, `removePassword`, `restorePassword`, `updatePassword`, `importPasswords`, `exportPasswords`, `clearAll` prop'larını alır. Ana şifre hiçbir bileşene verilmez.
 - `GeneratorPanel` → `savedPasswords` prop'u ile duplikasyon kontrolü yapar. Kasaya `onSaveToVault(entries)` ile tek seferde toplu yazar ve sonucu bekler.
 - **Kasa yazmaları sıralıdır:** `useSavedPasswords` içindeki her değişiklik `mutate(prev => next)` ile sıraya alınır. Yeni kasa işlemi eklerken `next` listesini `savedPasswords` state'inden hesaplama — art arda çağrılarda eski liste kullanılır ve kayıtlar kaybolur.
 - **Dışarıdan gelen kayıtlar normalleştirilir:** İçe aktarma, kilit açma ve migrasyonda her kayıt `normalizeVaultEntry` ile tamamlanır (eksik `charTypes`, `strength`, `length`, `date`, `name`, `id` şifreden/varsayılandan üretilir; bilinmeyen alanlar korunur). Şifresi olmayan kayıtlar atlanır ve içe aktarma önizlemesinde sayısı gösterilir. Hiç geçerli kayıt yoksa içe aktarma butonu kapalıdır.
@@ -113,7 +116,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 - **Ana şifre bellekte tutulmaz:** kilit açılışında (veya kurulumda) anahtar bir kez türetilir ve `useSavedPasswords` içinde dışa aktarılamaz (`extractable: false`) `CryptoKey` olarak tutulur (`vaultKeyRef = { key, salt }`). Kilitlenince silinir. Yazmalar `encryptWithKey` ile yapılır: kasa salt'ı sabit, IV her yazmada yeni.
 - Şifreli blob biçimi değişmez: `base64(salt[16] | iv[12] | ciphertext)`. Kasa, otomatik yedekler ve `.passgen` dosyaları ana şifreyle `decrypt(data, password)` ile açılır. Kilit açma GCM doğrulamasına dayanır; `passwordHash` / `hashSalt` yalnızca eski sürümlerle uyumluluk için yazılır.
 - Base64 dönüşümünde `bytesToBase64` / `base64ToBytes` kullan; `String.fromCharCode(...büyükDizi)` ~200 KB üstünde yığını taşırır.
-- Electron: CSP header aktif, sandbox aktif, dış URL navigasyonu ve popup'lar engelli.
+- Electron: CSP header aktif, sandbox aktif, dış URL navigasyonu ve popup'lar engelli. Kayıttaki site yalnızca `site:open` IPC ile varsayılan tarayıcıda açılır; ana süreç yalnızca `http:` / `https:` kabul eder (`toSiteUrl` renderer'da şema ekler ve doğrular).
 - Geçmiş en fazla 100 kayıt tutar, 30 günden eski kayıtlar otomatik temizlenir (kullanıcı bu kuralın kalmasını seçti).
 - Geçmiş diske **düz metin yazılmaz**: `passgen_history` değeri `{ version: 2, protected }` biçiminde Electron `safeStorage` (Windows DPAPI) ile şifrelidir (`secure:protect` / `secure:unprotect` IPC, `src/utils/historyStorage.js`). Eski düz dizi biçimi ilk açılışta şifreli biçime çevrilir. safeStorage yoksa (web modu) geçmiş yalnızca bellekte tutulur. Çözülemeyen veri silinmez, `passgen_history_unreadable` anahtarına kopyalanır.
 - Master şifre belirleme: **en az 12 karakter** ve güç skoru >= 2 ("Orta") zorunlu (`getMasterPasswordProblem`, `src/utils/masterPassword.js`). Kural yalnızca kasa kurulumunda (ve ileride ana şifre değiştirmede) uygulanır; mevcut ana şifreler ve kilit açma etkilenmez.

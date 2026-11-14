@@ -4,6 +4,8 @@ import { normalizeCategory } from './categories'
 const CHAR_TYPE_KEYS = ['uppercase', 'lowercase', 'numbers', 'symbols']
 // İçe aktarma önizlemesinde eklenen geçici alanlar kasaya yazılmaz
 const IMPORT_PREVIEW_FLAGS = ['isDuplicate', 'duplicateName']
+// Kayıt formundaki isteğe bağlı alanlar: kullanıcı adı, site, not
+export const OPTIONAL_TEXT_FIELDS = ['username', 'url', 'notes']
 
 function detectCharTypes(password) {
   return {
@@ -40,6 +42,14 @@ export function normalizeVaultEntry(raw) {
   const entry = { ...raw }
   IMPORT_PREVIEW_FLAGS.forEach((flag) => delete entry[flag])
   const name = toText(raw.name).trim()
+
+  // İsteğe bağlı metin alanları: boşsa alan hiç tutulmaz; içerik kısaltılmaz (veri kaybı olmasın)
+  for (const field of OPTIONAL_TEXT_FIELDS) {
+    if (!(field in entry)) continue
+    const text = field === 'notes' ? toText(entry[field]) : toText(entry[field]).trim()
+    if (text.trim()) entry[field] = text
+    else delete entry[field]
+  }
 
   return normalizeCategory({
     ...entry,

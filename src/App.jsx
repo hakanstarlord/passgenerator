@@ -143,6 +143,7 @@ function App() {
           {activeTab === 'vault' && (
             <VaultPanel
               passwords={savedPasswords}
+              savePasswords={savePasswords}
               removePassword={removePassword}
               restorePassword={restorePassword}
               updatePassword={updatePassword}

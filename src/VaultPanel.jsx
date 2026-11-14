@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { Copy, Check, Trash2, Eye, EyeOff, Search, AlertTriangle, Lock, Unlock, KeyRound, ShieldAlert, Pencil, X, Download, Upload, FolderOpen, Timer, Shield, Users, Landmark, Mail, ShoppingBag, Gamepad2, Briefcase, Tag, Undo2 } from 'lucide-react'
+import { Copy, Check, Trash2, Eye, EyeOff, Search, AlertTriangle, Lock, Unlock, KeyRound, ShieldAlert, Pencil, X, Download, Upload, FolderOpen, Timer, Shield, Users, Landmark, Mail, ShoppingBag, Gamepad2, Briefcase, Tag, Undo2, User, Globe, ExternalLink, StickyNote, Plus } from 'lucide-react'
+import VaultEntryForm from './VaultEntryForm'
 import { copyToClipboard } from './utils/clipboard'
+import { openSite } from './utils/siteUrl'
 import { calculateStrength, calculateEntropy } from './utils/passwordGenerator'
 import { parseImportFile, decryptImportData } from './utils/exportImport'
 import { flagDuplicateEntries } from './utils/duplicateCheck'
@@ -32,13 +34,10 @@ const charTypeLabels = {
   symbols: '#!@',
 }
 
-function VaultRow({ item, onRemove, isEditing, onStartEdit, onCancelEdit, onSaveEdit }) {
+function VaultRow({ item, onRemove, isEditing, onStartEdit, onCancelEdit, onSaveEdit, savedPasswords }) {
   const [visible, setVisible] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [editName, setEditName] = useState(item.name)
-  const [editPassword, setEditPassword] = useState(item.password)
-  const [editCategory, setEditCategory] = useState(item.category || 'other')
-  const [editError, setEditError] = useState('')
+  const [usernameCopied, setUsernameCopied] = useState(false)
 
   const handleCopy = useCallback(async () => {
     await copyToClipboard(item.password)
@@ -46,29 +45,11 @@ function VaultRow({ item, onRemove, isEditing, onStartEdit, onCancelEdit, onSave
     setTimeout(() => setCopied(false), 1500)
   }, [item.password])
 
-  const handleSave = useCallback(() => {
-    const trimmedName = editName.trim()
-    const trimmedPassword = editPassword.trim()
-    if (!trimmedName || !trimmedPassword) {
-      setEditError('Ad ve şifre boş bırakılamaz.')
-      return
-    }
-    onSaveEdit(item.id, { name: trimmedName, password: trimmedPassword, category: editCategory })
-    setEditError('')
-  }, [editName, editPassword, editCategory, item.id, onSaveEdit])
-
-  const handleCancel = useCallback(() => {
-    setEditName(item.name)
-    setEditPassword(item.password)
-    setEditCategory(item.category || 'other')
-    setEditError('')
-    onCancelEdit()
-  }, [item.name, item.password, item.category, onCancelEdit])
-
-  const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Escape') handleCancel()
-    if (e.key === 'Enter') handleSave()
-  }, [handleCancel, handleSave])
+  const handleCopyUsername = useCallback(async () => {
+    await copyToClipboard(item.username)
+    setUsernameCopied(true)
+    setTimeout(() => setUsernameCopied(false), 1500)
+  }, [item.username])
 
   const maskedPassword = '\u2022'.repeat(Math.min(item.password.length, 20))
 
@@ -78,78 +59,13 @@ function VaultRow({ item, onRemove, isEditing, onStartEdit, onCancelEdit, onSave
 
   if (isEditing) {
     return (
-      <div className="password-card rounded-xl bg-white/[0.03] border border-indigo-500/30 p-4">
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">Ad</label>
-            <input
-              type="text"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/[0.06] text-sm text-gray-200 focus:outline-none focus:border-indigo-500/50 transition-all"
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">Şifre</label>
-            <input
-              type={visible ? 'text' : 'password'}
-              value={editPassword}
-              onChange={(e) => setEditPassword(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/[0.06] text-sm font-mono text-gray-200 focus:outline-none focus:border-indigo-500/50 transition-all"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">Kategori</label>
-            <div className="flex flex-wrap gap-1.5">
-              {CATEGORIES.map((cat) => {
-                const CatIcon = categoryIcons[cat.icon]
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setEditCategory(cat.id)}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all ${
-                      editCategory === cat.id
-                        ? 'bg-indigo-500/20 text-indigo-400 ring-1 ring-indigo-500/30'
-                        : 'bg-white/[0.03] border border-white/[0.06] text-gray-400 hover:bg-white/[0.06]'
-                    }`}
-                  >
-                    <CatIcon size={12} />
-                    {cat.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-          {editError && <p className="text-xs text-red-400">{editError}</p>}
-          <div className="flex items-center gap-2 justify-end">
-            <button
-              onClick={() => setVisible(v => !v)}
-              className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white transition-all"
-              title={visible ? 'Gizle' : 'Göster'}
-            >
-              {visible ? <EyeOff size={14} /> : <Eye size={14} />}
-            </button>
-            <button
-              onClick={handleCancel}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 text-gray-400 hover:bg-white/10 transition-all"
-            >
-              <X size={14} />
-              İptal
-            </button>
-            <button
-              onClick={handleSave}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 transition-all"
-            >
-              <Check size={14} />
-              Kaydet
-            </button>
-          </div>
-        </div>
-      </div>
+      <VaultEntryForm
+        initial={item}
+        title="Kaydı Düzenle"
+        onSubmit={(values) => onSaveEdit(item.id, values)}
+        onCancel={onCancelEdit}
+        savedPasswords={savedPasswords}
+      />
     )
   }
 
@@ -171,6 +87,35 @@ function VaultRow({ item, onRemove, isEditing, onStartEdit, onCancelEdit, onSave
         </div>
         <span className="text-xs text-gray-600">{timeAgo(item.date)}</span>
       </div>
+
+      {(item.username || item.url) && (
+        <div className="flex items-center gap-x-4 gap-y-1 mb-2 flex-wrap text-xs">
+          {item.username && (
+            <span className="flex items-center gap-1.5 text-gray-400 min-w-0">
+              <User size={12} className="shrink-0 text-gray-500" />
+              <span className="truncate">{item.username}</span>
+              <button
+                onClick={handleCopyUsername}
+                className="shrink-0 p-1 rounded text-gray-500 hover:text-white hover:bg-white/10 transition-all"
+                title="Kullanıcı adını kopyala"
+              >
+                {usernameCopied ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
+              </button>
+            </span>
+          )}
+          {item.url && (
+            <button
+              onClick={() => openSite(item.url)}
+              className="flex items-center gap-1.5 text-indigo-400/80 hover:text-indigo-300 min-w-0 transition-colors"
+              title="Sitede aç"
+            >
+              <Globe size={12} className="shrink-0" />
+              <span className="truncate">{item.url}</span>
+              <ExternalLink size={11} className="shrink-0" />
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center gap-3 mb-3">
         <code className="flex-1 text-sm font-mono text-gray-100 bg-black/30 rounded-lg px-3 py-2 break-all select-all">
@@ -210,6 +155,13 @@ function VaultRow({ item, onRemove, isEditing, onStartEdit, onCancelEdit, onSave
         </button>
       </div>
 
+      {/* Not, şifreyle birlikte gösterilir (kurtarma kodu gibi hassas bilgi içerebilir) */}
+      {visible && item.notes && (
+        <p className="mb-3 px-3 py-2 rounded-lg bg-black/20 text-xs text-gray-300 whitespace-pre-wrap break-words">
+          {item.notes}
+        </p>
+      )}
+
       <div className="flex items-center gap-3 flex-wrap">
         <span
           className="text-xs font-medium px-2 py-0.5 rounded-full"
@@ -231,6 +183,12 @@ function VaultRow({ item, onRemove, isEditing, onStartEdit, onCancelEdit, onSave
           <span className="flex items-center gap-1 text-xs text-gray-500 font-mono">
             <Shield size={12} className="text-gray-600" />
             ~{calculateEntropy(item.length, item.charTypes)} bit
+          </span>
+        )}
+        {item.notes && !visible && (
+          <span className="flex items-center gap-1 text-xs text-gray-500" title="Notu görmek için şifreyi gösterin">
+            <StickyNote size={12} className="text-gray-600" />
+            Not
           </span>
         )}
       </div>
@@ -658,6 +616,7 @@ function ImportModal({ onImport, onClose, savedPasswords }) {
 
 export default function VaultPanel({
   passwords,
+  savePasswords,
   removePassword,
   restorePassword,
   updatePassword,
@@ -675,6 +634,7 @@ export default function VaultPanel({
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [showConfirm, setShowConfirm] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [isAdding, setIsAdding] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const { pendingDeletes, softDelete, undoDelete, clearAll: clearUndoBuffer } = useUndoDelete()
 
@@ -703,8 +663,11 @@ export default function VaultPanel({
     return <LockedView onUnlock={unlock} />
   }
 
+  // Arama ad, kullanıcı adı ve sitede yapılır (Türkçe büyük/küçük harf kurallarıyla)
+  const query = search.trim().toLocaleLowerCase('tr')
   const filtered = passwords.filter((item) => {
-    const matchesSearch = !search || item.name.toLowerCase().includes(search.toLowerCase())
+    const matchesSearch = !query || [item.name, item.username, item.url]
+      .some((value) => value && value.toLocaleLowerCase('tr').includes(query))
     const matchesCategory = categoryFilter === 'all' || (item.category || 'other') === categoryFilter
     return matchesSearch && matchesCategory
   })
@@ -720,10 +683,40 @@ export default function VaultPanel({
     setShowConfirm(false)
   }
 
-  function handleSaveEdit(id, updates) {
-    updatePassword(id, updates)
-    setEditingId(null)
+  async function handleSaveEdit(id, updates) {
+    const saved = await updatePassword(id, updates)
+    if (saved) setEditingId(null)
+    return saved
   }
+
+  // Elle eklenen kayıt: güç, uzunluk ve karakter türleri şifreden hesaplanır
+  async function handleAdd(values) {
+    const entry = normalizeVaultEntry({ ...values, id: crypto.randomUUID(), date: new Date().toISOString() })
+    if (!entry) return false
+    const saved = await savePasswords([entry])
+    if (saved) setIsAdding(false)
+    return saved
+  }
+
+  const addSection = isAdding ? (
+    <div className="mb-5">
+      <VaultEntryForm
+        title="Yeni Kayıt"
+        submitLabel="Kasaya Ekle"
+        onSubmit={handleAdd}
+        onCancel={() => setIsAdding(false)}
+        savedPasswords={passwords}
+      />
+    </div>
+  ) : (
+    <button
+      onClick={() => { setIsAdding(true); setEditingId(null) }}
+      className="w-full mb-5 py-2.5 rounded-xl border border-dashed border-white/10 text-gray-400 hover:border-indigo-500/40 hover:text-indigo-400 hover:bg-indigo-500/5 text-sm font-medium flex items-center justify-center gap-2 transition-all"
+    >
+      <Plus size={16} />
+      Yeni Kayıt
+    </button>
+  )
 
   async function handleExport() {
     await exportPasswords()
@@ -778,15 +771,18 @@ export default function VaultPanel({
             </button>
           </div>
         </div>
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-4">
-            <Lock size={28} className="text-gray-600" />
+        {addSection}
+        {!isAdding && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-4">
+              <Lock size={28} className="text-gray-600" />
+            </div>
+            <p className="text-gray-400 font-medium mb-1">Kasanız boş</p>
+            <p className="text-gray-600 text-sm">
+              Yukarıdan elle kayıt ekleyebilir ya da Oluştur sekmesinde şifre adı girerek kaydedebilirsiniz.
+            </p>
           </div>
-          <p className="text-gray-400 font-medium mb-1">Kasanız boş</p>
-          <p className="text-gray-600 text-sm">
-            Şifre adı girerek oluşturduğunuz şifreler otomatik olarak kasaya kaydedilir.
-          </p>
-        </div>
+        )}
         {showImport && (
           <ImportModal
             onImport={handleImport}
@@ -863,13 +859,15 @@ export default function VaultPanel({
         </div>
       </div>
 
+      {addSection}
+
       <div className="relative mb-3">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="İsme göre ara..."
+          placeholder="Ad, kullanıcı adı veya sitede ara..."
           className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/25 transition-all"
         />
       </div>
@@ -918,9 +916,10 @@ export default function VaultPanel({
               item={item}
               onRemove={handleSoftDelete}
               isEditing={editingId === item.id}
-              onStartEdit={(id) => setEditingId(id)}
+              onStartEdit={(id) => { setEditingId(id); setIsAdding(false) }}
               onCancelEdit={() => setEditingId(null)}
               onSaveEdit={handleSaveEdit}
+              savedPasswords={passwords}
             />
           ))}
         </div>

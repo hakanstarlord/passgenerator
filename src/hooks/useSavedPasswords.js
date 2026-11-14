@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
 import { deriveVaultKey, encryptWithKey, decryptWithKey, readSalt, hashPassword, bytesToBase64 } from '../utils/crypto'
-import { calculateStrength } from '../utils/passwordGenerator'
 import { normalizeVaultEntry } from '../utils/vaultEntry'
 import { saveAutoBackup, downloadExportFile } from '../utils/exportImport'
 
@@ -161,12 +160,11 @@ export default function useSavedPasswords() {
   const updatePassword = useCallback((id, updates) => {
     return mutate((prev) => prev.map(item => {
       if (item.id !== id) return item
-      const updated = { ...item, ...updates }
-      if (updates.password && updates.password !== item.password) {
-        updated.strength = calculateStrength(updates.password)
-        updated.length = updates.password.length
-      }
-      return updated
+      const merged = { ...item, ...updates }
+      // Şifre değiştiyse karakter türleri yeni şifreden yeniden hesaplanır
+      if (updates.password !== undefined && updates.password !== item.password) delete merged.charTypes
+      // Güç ve uzunluk şifreden türetilir; boşaltılan isteğe bağlı alanlar kaldırılır
+      return normalizeVaultEntry(merged) ?? item
     }))
   }, [mutate])
 

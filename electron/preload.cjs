@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
+  openSite: (url) => ipcRenderer.invoke('site:open', url),
   backupVault: (json) => ipcRenderer.invoke('vault:backup', json),
   openBackupFolder: () => ipcRenderer.invoke('vault:open-backups'),
   copySecret: (text) => ipcRenderer.invoke('clipboard:copy-secret', text),
