@@ -1,10 +1,11 @@
-import { app, BrowserWindow, ipcMain, session, net, shell, safeStorage, clipboard } from 'electron'
+import { app, BrowserWindow, ipcMain, session, net, shell, safeStorage, clipboard, powerMonitor } from 'electron'
 import { Buffer } from 'buffer'
 import { join } from 'path'
 import { readFileSync } from 'fs'
 import { mkdir } from 'fs/promises'
 import { BACKUP_DIR_NAME, writeBackupFile } from './backups.js'
 import { createSecretClipboard } from './secretClipboard.js'
+import { registerLockTriggers } from './lockTriggers.js'
 
 // Kopyalanan şifreler 30 sn sonra panodan silinir; pencere odakta olmasa da çalışır
 const secretClipboard = createSecretClipboard({ clipboard })
@@ -217,6 +218,15 @@ app.whenReady().then(() => {
   })
 
   createWindow()
+
+  // Windows kilitlenince (Win+L) veya uykuya geçince kasayı kilitle, bekleyen şifreyi panodan sil
+  registerLockTriggers({
+    powerMonitor,
+    onLock: () => {
+      for (const win of BrowserWindow.getAllWindows()) win.webContents.send('vault:lock-request')
+      secretClipboard.clearNow().catch(() => {})
+    },
+  })
 
   // 5sn sonra güncelleme kontrolü (başlangıç hızını etkilememek için)
   setTimeout(() => checkForUpdates(), 5000)

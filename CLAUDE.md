@@ -32,9 +32,10 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 │   └── icon.ico                   # Windows ikonu (exe'ye gömülür, rcedit ile)
 ├── electron/
 │   ├── main.js                    # Electron ana süreç (pencere, ikon, CSP, GitHub güncelleme kontrolü)
-│   ├── preload.cjs                # Preload script (contextBridge: fullscreen, güncelleme, harici URL, kasa yedeği, safeStorage, pano)
+│   ├── preload.cjs                # Preload script (contextBridge: fullscreen, güncelleme, harici URL, kasa yedeği, safeStorage, pano, kilit isteği)
 │   ├── backups.js                 # Kasa yedeği adı ve doğrulama (saf fonksiyonlar, test edilir)
 │   ├── secretClipboard.js         # Şifre kopyalama + 30 sn sonra pano temizliği (ana süreç, test edilir)
+│   ├── lockTriggers.js            # Ekran kilidi / uyku olaylarını kasa kilidine bağlar (test edilir)
 │   ├── __tests__/                 # Vitest testleri (exe'ye paketlenmez)
 │   └── setIcon.cjs                # afterPack hook (rcedit ile exe'ye ikon gömer)
 ├── scripts/
@@ -127,6 +128,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 - Ana şifre değiştirme (`changeMasterPassword`, `reencryptVault`): mevcut şifre kasa verisi gerçekten çözülerek doğrulanır; yeni şifre aynı kurala tabidir ve mevcut şifreyle aynı olamaz. İşlem yazma kuyruğunda çalışır. Önce mevcut hal eski şifreyle yedeklenir, kasa yeni salt ile yeniden şifrelenir, sonra yeni şifreyle yedeklenir. Eski yedekler silinmez ve eski şifreyle açılır.
 - Kasa açma deneme sınırlaması: 5 başarısız → 30sn, 10 ve üstü → her başarısızlıkta 5dk bekleme. Durum `localStorage`'da (`passgen_unlock_rate`) tutulur, uygulama yeniden başlatılınca korunur (`src/utils/unlockRateLimit.js`). Başarılı açılışta veya son başarısızlıktan 24 saat sonra sayaç sıfırlanır. Bekleme süresi en fazla 5dk'ya kırpılır (saat geri alınırsa uzamasın).
 - Otomatik kilit: 5dk hareketsizlikte kasa kilitlenir, 30sn önce uyarı banner'ı gösterilir.
+- Sistem kilidi: Windows kilitlenince (`powerMonitor` `lock-screen`) veya uykuya geçince (`suspend`) ana süreç `vault:lock-request` gönderir, App `lock()` çağırır; bekleyen pano şifresi de hemen silinir (`electron/lockTriggers.js`). Pencereyi küçültmek kilitlemez (kullanıcı tercihi).
 - Kasaya kaydetmeden önce duplikasyon kontrolü yapılır.
 - Dışa aktarma: kasa verileri master şifreyle şifreli `.passgen` dosyası olarak indirilir.
 - İçe aktarma: `.passgen` dosyası şifre çözülerek, tarayıcı `.csv` dosyası (Chrome/Edge/Firefox; `csvToEntries`) doğrudan önizlenir; birleştir/değiştir modları desteklenir. CSV önizlemesinde dosyanın şifresiz olduğu ve silinmesi önerildiği yazılır; uygulama dosyayı silmez.

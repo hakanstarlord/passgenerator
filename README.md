@@ -20,6 +20,7 @@ Güvenli ve kullanımı kolay masaüstü şifre üretici uygulaması.
 - **Tarayıcıdan içe aktarma** — Chrome, Edge veya Firefox'un dışa aktardığı şifre CSV'si önizlenip kasaya alınır; birebir aynı kayıtlar atlanır
 - **Geçmiş** — Üretilen şifreler Windows hesabına bağlı olarak şifreli saklanır (Electron safeStorage); maks. 100 kayıt, 30 gün otomatik temizleme
 - **Pano güvenliği** — Kopyalanan şifreler 30 saniye sonra panodan otomatik temizlenir
+- **Otomatik kilit** — Kasa 5 dakika hareketsizlikte, Windows kilitlenince (Win+L) veya bilgisayar uykuya geçince kilitlenir
 - **Koyu tema** — Göz yormayan karanlık arayüz
 - **Masaüstü uygulaması** — Electron ile Windows portable exe olarak dağıtılabilir
 - **Otomatik yedek** — Masaüstü uygulamasında kasa her değişiklikte şifreli bir `.passgen` dosyası olarak `%APPDATA%\password-generator\yedekler` klasörüne yedeklenir. Yedekler hiç silinmez; geri yüklemek için İçe Aktar'dan bir yedek seçilir

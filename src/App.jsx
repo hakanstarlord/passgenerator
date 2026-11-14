@@ -28,6 +28,14 @@ function App() {
 
   const { showWarning: showAutoLockWarning, remainingSeconds: autoLockSeconds } = useAutoLock(isLocked, lock)
 
+  // Windows kilitlenince veya uykuya geçince ana süreç kasanın kilitlenmesini ister
+  useEffect(() => {
+    const api = window.electronAPI
+    if (!api?.onLockRequest) return
+    const handler = api.onLockRequest(() => lock())
+    return () => api.removeLockRequestListener(handler)
+  }, [lock])
+
   const toggleFullscreen = useCallback(async () => {
     if (window.electronAPI) {
       await window.electronAPI.toggleFullscreen()

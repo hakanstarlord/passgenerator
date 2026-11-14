@@ -11,6 +11,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removeFullscreenListener: (handler) => {
     ipcRenderer.removeListener('fullscreen-changed', handler)
   },
+  // Ekran kilidi / uyku: ana süreç kasanın kilitlenmesini ister
+  onLockRequest: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('vault:lock-request', handler)
+    return handler
+  },
+  removeLockRequestListener: (handler) => {
+    ipcRenderer.removeListener('vault:lock-request', handler)
+  },
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   openSite: (url) => ipcRenderer.invoke('site:open', url),
