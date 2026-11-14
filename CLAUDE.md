@@ -74,6 +74,8 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 │       ├── unlockRateLimit.js     # Kilit açma deneme sayacı (localStorage, 24 saat sıfırlama)
 │       ├── siteUrl.js             # Site alanını http/https adresine çevirir, tarayıcıda açar
 │       └── __tests__/             # Vitest birim testleri (utils/ için)
+├── tasks/lessons.md               # Kullanıcı düzeltmelerinden çıkan kurallar
+├── CHANGELOG.md                   # Sürüm sürüm yapılanlar (Türkçe)
 ├── release/                       # Electron build çıktısı (git-ignore)
 ```
 
@@ -196,6 +198,7 @@ npm run electron:watch # Değişiklikte exe'yi otomatik yeniden derle
 4. Yeni yardımcı fonksiyon gerekiyorsa `src/utils/` altına.
 5. Her değişiklikten sonra `npm run build` ile doğrula.
 6. **Bu dosyayı güncelle** — yeni kural veya yapı değişikliği varsa buraya ekle.
+7. **Sürüm değişince** `npm version X.Y.Z --no-git-tag-version` kullan ve `CHANGELOG.md`'nin başına o sürümün bölümünü ekle. GitHub Release etiketi `vX.Y.Z` olmalı.
 
 ---
 
