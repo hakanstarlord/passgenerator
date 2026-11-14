@@ -44,7 +44,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 │   ├── hooks/
 │   │   ├── usePasswordHistory.js  # Geçmiş hook (safeStorage ile şifreli, boyut sınırlı, otomatik temizleme)
 │   │   ├── useSavedPasswords.js   # Kasa hook (AES-GCM şifreli, kilit/açma, düzenleme, içe/dışa aktarma)
-│   │   ├── useUnlockRateLimit.js  # Kasa açma deneme sınırlaması (5→30sn, 10→5dk)
+│   │   ├── useUnlockRateLimit.js  # Kasa açma deneme sınırlaması (5→30sn, 10→5dk, kalıcı)
 │   │   ├── useAutoLock.js         # Otomatik kilit (5dk hareketsizlik, 30sn uyarı)
 │   │   └── useUndoDelete.js       # Kasada silmeyi geri alma (7 sn, en fazla 5 kayıt)
 │   └── utils/
@@ -57,6 +57,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 │       ├── vaultEntry.js          # normalizeVaultEntry: eksik alanları şifreden tamamlar
 │       ├── masterPassword.js      # Ana şifre kuralı (getMasterPasswordProblem)
 │       ├── historyStorage.js      # Geçmişi safeStorage ile şifreli okur/yazar (düz metin yazmaz)
+│       ├── unlockRateLimit.js     # Kilit açma deneme sayacı (localStorage, 24 saat sıfırlama)
 │       └── __tests__/             # Vitest birim testleri (utils/ için)
 ├── release/                       # Electron build çıktısı (git-ignore)
 ```
@@ -108,7 +109,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 - Geçmiş en fazla 100 kayıt tutar, 30 günden eski kayıtlar otomatik temizlenir (kullanıcı bu kuralın kalmasını seçti).
 - Geçmiş diske **düz metin yazılmaz**: `passgen_history` değeri `{ version: 2, protected }` biçiminde Electron `safeStorage` (Windows DPAPI) ile şifrelidir (`secure:protect` / `secure:unprotect` IPC, `src/utils/historyStorage.js`). Eski düz dizi biçimi ilk açılışta şifreli biçime çevrilir. safeStorage yoksa (web modu) geçmiş yalnızca bellekte tutulur. Çözülemeyen veri silinmez, `passgen_history_unreadable` anahtarına kopyalanır.
 - Master şifre belirleme: **en az 12 karakter** ve güç skoru >= 2 ("Orta") zorunlu (`getMasterPasswordProblem`, `src/utils/masterPassword.js`). Kural yalnızca kasa kurulumunda (ve ileride ana şifre değiştirmede) uygulanır; mevcut ana şifreler ve kilit açma etkilenmez.
-- Kasa açma deneme sınırlaması: 5 başarısız → 30sn, 10 başarısız → 5dk bekleme (`sessionStorage`).
+- Kasa açma deneme sınırlaması: 5 başarısız → 30sn, 10 ve üstü → her başarısızlıkta 5dk bekleme. Durum `localStorage`'da (`passgen_unlock_rate`) tutulur, uygulama yeniden başlatılınca korunur (`src/utils/unlockRateLimit.js`). Başarılı açılışta veya son başarısızlıktan 24 saat sonra sayaç sıfırlanır. Bekleme süresi en fazla 5dk'ya kırpılır (saat geri alınırsa uzamasın).
 - Otomatik kilit: 5dk hareketsizlikte kasa kilitlenir, 30sn önce uyarı banner'ı gösterilir.
 - Kasaya kaydetmeden önce duplikasyon kontrolü yapılır.
 - Dışa aktarma: kasa verileri master şifreyle şifreli `.passgen` dosyası olarak indirilir.
