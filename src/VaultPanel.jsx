@@ -2,7 +2,8 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { Copy, Check, Trash2, Eye, EyeOff, Search, AlertTriangle, Lock, Unlock, KeyRound, ShieldAlert, Pencil, X, Download, Upload, FolderOpen, Timer, Shield, Users, Landmark, Mail, ShoppingBag, Gamepad2, Briefcase, Tag, Undo2, User, Globe, ExternalLink, StickyNote, Plus } from 'lucide-react'
 import VaultEntryForm from './VaultEntryForm'
 import { copyToClipboard } from './utils/clipboard'
-import { openSite } from './utils/siteUrl'
+import { openSite, toSiteUrl } from './utils/siteUrl'
+import { csvToEntries } from './utils/csvImport'
 import { calculateStrength, calculateEntropy } from './utils/passwordGenerator'
 import { parseImportFile, decryptImportData } from './utils/exportImport'
 import { flagDuplicateEntries } from './utils/duplicateCheck'
@@ -103,7 +104,7 @@ function VaultRow({ item, onRemove, isEditing, onStartEdit, onCancelEdit, onSave
               </button>
             </span>
           )}
-          {item.url && (
+          {item.url && (toSiteUrl(item.url) ? (
             <button
               onClick={() => openSite(item.url)}
               className="flex items-center gap-1.5 text-indigo-400/80 hover:text-indigo-300 min-w-0 transition-colors"
@@ -113,7 +114,13 @@ function VaultRow({ item, onRemove, isEditing, onStartEdit, onCancelEdit, onSave
               <span className="truncate">{item.url}</span>
               <ExternalLink size={11} className="shrink-0" />
             </button>
-          )}
+          ) : (
+            // http/https olmayan adresler (ör. android:// uygulama kayıtları) açılmaz, yalnızca gösterilir
+            <span className="flex items-center gap-1.5 text-gray-500 min-w-0" title={item.url}>
+              <Globe size={12} className="shrink-0" />
+              <span className="truncate">{item.url}</span>
+            </span>
+          ))}
         </div>
       )}
 
@@ -399,15 +406,30 @@ function ImportModal({ onImport, onClose, savedPasswords }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [replaceConfirm, setReplaceConfirm] = useState(false)
+  const [source, setSource] = useState('passgen')
   const fileInputRef = useRef(null)
   // Otomatik yedekler yalnızca masaüstü uygulamasında yazılır
   const canOpenBackups = !!window.electronAPI?.openBackupFolder
+
+  // Eksik alanlar tamamlanır; şifresi olmayan kayıtlar önizlemede sayılıp atlanır
+  function showPreview(rawEntries, fileSource) {
+    const valid = rawEntries.map(normalizeVaultEntry).filter(Boolean)
+    setSkippedCount(rawEntries.length - valid.length)
+    setEntries(flagDuplicateEntries(valid, savedPasswords))
+    setSource(fileSource)
+    setStep('preview')
+  }
 
   async function handleFileSelect(e) {
     const file = e.target.files?.[0]
     if (!file) return
     setError('')
     try {
+      // Tarayıcı CSV'si şifresizdir: şifre adımı olmadan doğrudan önizlemeye geçilir
+      if (/\.csv$/i.test(file.name)) {
+        showPreview(csvToEntries(await file.text()), 'csv')
+        return
+      }
       const parsed = await parseImportFile(file)
       setFileData(parsed)
       setStep('password')
@@ -421,12 +443,7 @@ function ImportModal({ onImport, onClose, savedPasswords }) {
     setLoading(true)
     setError('')
     try {
-      const decrypted = await decryptImportData(fileData, password)
-      // Eksik alanlar tamamlanır; şifresi olmayan kayıtlar önizlemede sayılıp atlanır
-      const valid = decrypted.map(normalizeVaultEntry).filter(Boolean)
-      setSkippedCount(decrypted.length - valid.length)
-      setEntries(flagDuplicateEntries(valid, savedPasswords))
-      setStep('preview')
+      showPreview(await decryptImportData(fileData, password), 'passgen')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -462,12 +479,12 @@ function ImportModal({ onImport, onClose, savedPasswords }) {
         {step === 'file' && (
           <div className="space-y-4">
             <p className="text-sm text-gray-400">
-              Daha önce dışa aktarılmış bir <code className="text-indigo-400">.passgen</code> dosyası seçin.
+              Bir <code className="text-indigo-400">.passgen</code> yedeği ya da Chrome, Edge veya Firefox&apos;tan dışa aktarılmış bir <code className="text-indigo-400">.csv</code> şifre dosyası seçin.
             </p>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".passgen"
+              accept=".passgen,.csv"
               onChange={handleFileSelect}
               className="hidden"
             />
@@ -530,7 +547,9 @@ function ImportModal({ onImport, onClose, savedPasswords }) {
             <p className="text-sm text-gray-400">
               {entries.length} kayıt bulundu.
               {duplicateCount > 0 && (
-                <span className="text-amber-400"> ({duplicateCount} adet mevcut kasanızla eşleşiyor)</span>
+                <span className="text-amber-400">
+                  {' '}({duplicateCount} adet kasada zaten var{mode === 'merge' ? ', atlanacak' : ''})
+                </span>
               )}
               {skippedCount > 0 && (
                 <span className="block mt-1 text-amber-400">
@@ -538,6 +557,13 @@ function ImportModal({ onImport, onClose, savedPasswords }) {
                 </span>
               )}
             </p>
+
+            {source === 'csv' && (
+              <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs">
+                <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                <span>CSV dosyası şifrelerinizi şifresiz içerir. İçe aktardıktan sonra dosyayı silmeniz önerilir.</span>
+              </div>
+            )}
 
             <div className="max-h-48 overflow-y-auto space-y-2">
               {entries.map((entry, i) => (
@@ -549,8 +575,11 @@ function ImportModal({ onImport, onClose, savedPasswords }) {
                       : 'bg-white/[0.03] border border-white/[0.06]'
                   }`}
                 >
-                  <span className="text-gray-200">{entry.name}</span>
-                  <div className="flex items-center gap-2">
+                  <span className="text-gray-200 min-w-0 truncate">
+                    {entry.name}
+                    {entry.username && <span className="text-gray-500"> · {entry.username}</span>}
+                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
                     <span className="text-gray-500">{entry.length} kar.</span>
                     {entry.isDuplicate && <span className="text-amber-400">Mevcut</span>}
                   </div>
@@ -584,7 +613,7 @@ function ImportModal({ onImport, onClose, savedPasswords }) {
               </div>
               <p className="text-xs text-gray-600">
                 {mode === 'merge'
-                  ? 'Mevcut kayıtlar korunur, yalnızca yeni şifreler eklenir.'
+                  ? 'Mevcut kayıtlar korunur; kasada birebir aynısı (ad, kullanıcı adı, site, şifre) olanlar atlanır.'
                   : 'Mevcut tüm kayıtlar silinir, dosyadaki kayıtlarla değiştirilir.'}
               </p>
             </div>

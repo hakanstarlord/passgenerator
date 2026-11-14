@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { deriveVaultKey, encryptWithKey, decryptWithKey, readSalt, hashPassword, bytesToBase64 } from '../utils/crypto'
 import { normalizeVaultEntry } from '../utils/vaultEntry'
+import { mergeEntries } from '../utils/duplicateCheck'
 import { saveAutoBackup, downloadExportFile } from '../utils/exportImport'
 import { reencryptVault } from '../utils/vaultPassword'
 import { getMasterPasswordProblem } from '../utils/masterPassword'
@@ -36,6 +37,9 @@ export default function useSavedPasswords() {
   const passwordsRef = useRef([])
   // Kasa yazmaları sırayla çalışır, böylece art arda gelen değişiklikler birbirini ezmez
   const writeQueueRef = useRef(Promise.resolve())
+  // Yedekler yazmadan sonraki hali alır. Her kilit açma oturumunun ilk yazmasından önce
+  // mevcut hal de bir kez yedeklenir; böylece hiç yedeği olmayan bir hal kaybolmaz.
+  const sessionBackupDoneRef = useRef(false)
 
   const stored = readRawStorage()
   const hasLegacy = isLegacyData(stored)
@@ -65,6 +69,11 @@ export default function useSavedPasswords() {
       let next
       try {
         next = updater(passwordsRef.current)
+        if (!sessionBackupDoneRef.current) {
+          const current = readRawStorage()
+          if (current?.data) saveAutoBackup(current.data, passwordsRef.current.length)
+          sessionBackupDoneRef.current = true
+        }
         await persistEncrypted(next, vaultKey)
       } catch {
         return false
@@ -113,6 +122,8 @@ export default function useSavedPasswords() {
     }
 
     vaultKeyRef.current = { key, salt: vaultSalt }
+    // Kurulumdaki ilk hal zaten yedeklendi
+    sessionBackupDoneRef.current = true
     passwordsRef.current = initialPasswords
     setSavedPasswords(initialPasswords)
     setIsLocked(false)
@@ -131,6 +142,7 @@ export default function useSavedPasswords() {
       // Daha önce eksik alanlarla kaydedilmiş kayıtlar da burada onarılır
       const passwords = toVaultEntries(JSON.parse(plaintext))
       vaultKeyRef.current = { key, salt }
+      sessionBackupDoneRef.current = false
       passwordsRef.current = passwords
       setSavedPasswords(passwords)
       setIsLocked(false)
@@ -142,6 +154,7 @@ export default function useSavedPasswords() {
 
   const lock = useCallback(() => {
     vaultKeyRef.current = null
+    sessionBackupDoneRef.current = false
     passwordsRef.current = []
     setSavedPasswords([])
     setIsLocked(true)
@@ -174,8 +187,8 @@ export default function useSavedPasswords() {
     return mutate((prev) => {
       const incoming = toVaultEntries(entries).map(e => ({ ...e, id: crypto.randomUUID() }))
       if (mode === 'replace') return incoming
-      const existingPasswords = new Set(prev.map(p => p.password))
-      return [...prev, ...incoming.filter(e => !existingPasswords.has(e.password))]
+      // Birebir aynı kayıtlar atlanır; aynı şifreli farklı site/ad kayıtları eklenir
+      return mergeEntries(prev, incoming)
     })
   }, [mutate])
 
@@ -207,6 +220,7 @@ export default function useSavedPasswords() {
         const count = passwordsRef.current.length
         // Yedekler silinmez: değişiklikten önceki hal eski şifreyle bir kez daha yedeklenir
         saveAutoBackup(stored.data, count)
+        sessionBackupDoneRef.current = true
         localStorage.setItem(STORAGE_KEY, JSON.stringify(result.vault))
         saveAutoBackup(result.vault.data, count)
       } catch {

@@ -60,7 +60,8 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 │       ├── passwordGenerator.js   # generatePassword, calculateStrength, calculateEntropy
 │       ├── clipboard.js           # copyToClipboard (30 sn otomatik temizleme)
 │       ├── crypto.js              # AES-GCM şifreleme/çözme, PBKDF2 anahtar türetme
-│       ├── duplicateCheck.js      # Kasada duplikasyon tespiti
+│       ├── duplicateCheck.js      # Aynı şifre uyarısı, birebir aynı kayıt (entryKey) ve birleştirme
+│       ├── csvImport.js           # Chrome/Edge/Firefox şifre CSV'sini ayrıştırır
 │       ├── exportImport.js        # Kasa dışa/içe aktarma (.passgen dosya formatı)
 │       ├── categories.js          # Kasa kategorileri (etiket, ikon, normalizeCategory)
 │       ├── vaultEntry.js          # normalizeVaultEntry: eksik alanları şifreden tamamlar
@@ -126,7 +127,9 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 - Otomatik kilit: 5dk hareketsizlikte kasa kilitlenir, 30sn önce uyarı banner'ı gösterilir.
 - Kasaya kaydetmeden önce duplikasyon kontrolü yapılır.
 - Dışa aktarma: kasa verileri master şifreyle şifreli `.passgen` dosyası olarak indirilir.
-- İçe aktarma: `.passgen` dosyası şifre çözülerek önizlenir, birleştir/değiştir modları desteklenir.
+- İçe aktarma: `.passgen` dosyası şifre çözülerek, tarayıcı `.csv` dosyası (Chrome/Edge/Firefox; `csvToEntries`) doğrudan önizlenir; birleştir/değiştir modları desteklenir. CSV önizlemesinde dosyanın şifresiz olduğu ve silinmesi önerildiği yazılır; uygulama dosyayı silmez.
+- **Birleştirmede tekrar = birebir aynı kayıt** (`entryKey`: ad + kullanıcı adı + site, Türkçe küçük harf; şifre birebir). Yalnızca şifreye göre ayıklama yapma: aynı şifre farklı sitelerde kullanılabilir ve bu kayıtlar sessizce atlanırdı. `findDuplicatePassword` yalnızca "bu şifre kasada var" uyarısı içindir.
+- **İlk yazmadan önce yedek:** otomatik yedek yazmadan sonraki hali alır. Bu yüzden her kilit açma oturumunun ilk yazmasından önce mevcut hal bir kez yedeklenir (`sessionBackupDoneRef`). Böylece hiçbir hal yedeksiz kalmaz.
 - Otomatik yedek (yalnızca Electron): her başarılı kasa yazmasından sonra şifreli `.passgen` yedeği `%APPDATA%\password-generator\yedekler` klasörüne **yeni bir dosya** olarak yazılır (`saveAutoBackup` → `vault:backup` IPC → `electron/backups.js`). Yedekler **asla silinmez, döndürülmez, üzerine yazılmaz** (`wx` bayrağı). Geri yükleme İçe Aktar ile yapılır; İçe Aktar penceresinde "Yedek Klasörünü Aç" butonu vardır.
 
 ## Güçlük Hesaplama
