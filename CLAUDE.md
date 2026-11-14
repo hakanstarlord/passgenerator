@@ -65,6 +65,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 │       ├── categories.js          # Kasa kategorileri (etiket, ikon, normalizeCategory)
 │       ├── vaultEntry.js          # normalizeVaultEntry: eksik alanları şifreden tamamlar
 │       ├── masterPassword.js      # Ana şifre kuralı (getMasterPasswordProblem)
+│       ├── vaultPassword.js       # reencryptVault: ana şifre değişince kasayı yeniden şifreler
 │       ├── historyStorage.js      # Geçmişi safeStorage ile şifreli okur/yazar (düz metin yazmaz)
 │       ├── unlockRateLimit.js     # Kilit açma deneme sayacı (localStorage, 24 saat sıfırlama)
 │       ├── siteUrl.js             # Site alanını http/https adresine çevirir, tarayıcıda açar
@@ -99,7 +100,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 - `GeneratorPanel` → `onGenerate` callback ile geçmişe yazar. Kasaya kaydedilen şifreler geçmişe eklenmez.
 - `HistoryPanel` → `removeFromHistory`, `clearHistory` prop'larını alır.
 - Kasa kaydı alanları: `id`, `name`, `password`, `category`, `date`, `strength`, `length`, `charTypes` ve isteğe bağlı `username`, `url`, `notes` (boşsa hiç tutulmaz). Elle ekleme ve düzenleme `VaultEntryForm` ile yapılır; kayıt `normalizeVaultEntry`'den geçer (güç, uzunluk, karakter türleri şifreden hesaplanır). Not, şifre gösterildiğinde görünür.
-- `VaultPanel` → `savePasswords`, `unlock`, `lock`, `setupMasterPassword`, `removePassword`, `restorePassword`, `updatePassword`, `importPasswords`, `exportPasswords`, `clearAll` prop'larını alır. Ana şifre hiçbir bileşene verilmez.
+- `VaultPanel` → `savePasswords`, `unlock`, `lock`, `setupMasterPassword`, `removePassword`, `restorePassword`, `updatePassword`, `importPasswords`, `exportPasswords`, `changeMasterPassword`, `clearAll` prop'larını alır. Ana şifre hiçbir bileşene verilmez.
 - `GeneratorPanel` → `savedPasswords` prop'u ile duplikasyon kontrolü yapar. Kasaya `onSaveToVault(entries)` ile tek seferde toplu yazar ve sonucu bekler.
 - **Kasa yazmaları sıralıdır:** `useSavedPasswords` içindeki her değişiklik `mutate(prev => next)` ile sıraya alınır. Yeni kasa işlemi eklerken `next` listesini `savedPasswords` state'inden hesaplama — art arda çağrılarda eski liste kullanılır ve kayıtlar kaybolur.
 - **Dışarıdan gelen kayıtlar normalleştirilir:** İçe aktarma, kilit açma ve migrasyonda her kayıt `normalizeVaultEntry` ile tamamlanır (eksik `charTypes`, `strength`, `length`, `date`, `name`, `id` şifreden/varsayılandan üretilir; bilinmeyen alanlar korunur). Şifresi olmayan kayıtlar atlanır ve içe aktarma önizlemesinde sayısı gösterilir. Hiç geçerli kayıt yoksa içe aktarma butonu kapalıdır.
@@ -119,7 +120,8 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 - Electron: CSP header aktif, sandbox aktif, dış URL navigasyonu ve popup'lar engelli. Kayıttaki site yalnızca `site:open` IPC ile varsayılan tarayıcıda açılır; ana süreç yalnızca `http:` / `https:` kabul eder (`toSiteUrl` renderer'da şema ekler ve doğrular).
 - Geçmiş en fazla 100 kayıt tutar, 30 günden eski kayıtlar otomatik temizlenir (kullanıcı bu kuralın kalmasını seçti).
 - Geçmiş diske **düz metin yazılmaz**: `passgen_history` değeri `{ version: 2, protected }` biçiminde Electron `safeStorage` (Windows DPAPI) ile şifrelidir (`secure:protect` / `secure:unprotect` IPC, `src/utils/historyStorage.js`). Eski düz dizi biçimi ilk açılışta şifreli biçime çevrilir. safeStorage yoksa (web modu) geçmiş yalnızca bellekte tutulur. Çözülemeyen veri silinmez, `passgen_history_unreadable` anahtarına kopyalanır.
-- Master şifre belirleme: **en az 12 karakter** ve güç skoru >= 2 ("Orta") zorunlu (`getMasterPasswordProblem`, `src/utils/masterPassword.js`). Kural yalnızca kasa kurulumunda (ve ileride ana şifre değiştirmede) uygulanır; mevcut ana şifreler ve kilit açma etkilenmez.
+- Master şifre belirleme: **en az 12 karakter** ve güç skoru >= 2 ("Orta") zorunlu (`getMasterPasswordProblem`, `src/utils/masterPassword.js`). Kural kasa kurulumunda ve ana şifre değiştirmede uygulanır; mevcut ana şifreler ve kilit açma etkilenmez.
+- Ana şifre değiştirme (`changeMasterPassword`, `reencryptVault`): mevcut şifre kasa verisi gerçekten çözülerek doğrulanır; yeni şifre aynı kurala tabidir ve mevcut şifreyle aynı olamaz. İşlem yazma kuyruğunda çalışır. Önce mevcut hal eski şifreyle yedeklenir, kasa yeni salt ile yeniden şifrelenir, sonra yeni şifreyle yedeklenir. Eski yedekler silinmez ve eski şifreyle açılır.
 - Kasa açma deneme sınırlaması: 5 başarısız → 30sn, 10 ve üstü → her başarısızlıkta 5dk bekleme. Durum `localStorage`'da (`passgen_unlock_rate`) tutulur, uygulama yeniden başlatılınca korunur (`src/utils/unlockRateLimit.js`). Başarılı açılışta veya son başarısızlıktan 24 saat sonra sayaç sıfırlanır. Bekleme süresi en fazla 5dk'ya kırpılır (saat geri alınırsa uzamasın).
 - Otomatik kilit: 5dk hareketsizlikte kasa kilitlenir, 30sn önce uyarı banner'ı gösterilir.
 - Kasaya kaydetmeden önce duplikasyon kontrolü yapılır.

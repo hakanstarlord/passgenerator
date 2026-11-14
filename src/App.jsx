@@ -23,7 +23,7 @@ function App() {
     savedPasswords, isLocked, isInitialized, needsMigration,
     unlock, lock, setupMasterPassword,
     savePasswords, removePassword, clearAll: clearVault,
-    updatePassword, importPasswords, restorePassword, exportPasswords
+    updatePassword, importPasswords, restorePassword, exportPasswords, changeMasterPassword
   } = useSavedPasswords()
 
   const { showWarning: showAutoLockWarning, remainingSeconds: autoLockSeconds } = useAutoLock(isLocked, lock)
@@ -149,6 +149,7 @@ function App() {
               updatePassword={updatePassword}
               importPasswords={importPasswords}
               exportPasswords={exportPasswords}
+              changeMasterPassword={changeMasterPassword}
               clearAll={clearVault}
               isLocked={isLocked}
               isInitialized={isInitialized}

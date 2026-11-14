@@ -614,6 +614,157 @@ function ImportModal({ onImport, onClose, savedPasswords }) {
   )
 }
 
+const CHANGE_PASSWORD_ERRORS = {
+  'wrong-current': 'Mevcut ana şifre yanlış.',
+  same: 'Yeni ana şifre mevcut şifreyle aynı olamaz.',
+  locked: 'Kasa kilitlendi. Kilidi açıp tekrar deneyin.',
+  failed: 'Bir hata oluştu. Tekrar deneyin.',
+}
+
+const modalInputClass = 'w-full px-4 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/25 transition-all'
+
+function ChangeMasterPasswordModal({ onChange, onClose }) {
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [done, setDone] = useState(false)
+
+  const strength = next ? calculateStrength(next) : null
+  const problem = next ? getMasterPasswordProblem(next) : null
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!current) {
+      setError('Mevcut ana şifreyi girin.')
+      return
+    }
+    const nextProblem = getMasterPasswordProblem(next)
+    if (nextProblem) {
+      setError(nextProblem)
+      return
+    }
+    if (next !== confirm) {
+      setError('Yeni şifreler eşleşmiyor.')
+      return
+    }
+    if (current === next) {
+      setError(CHANGE_PASSWORD_ERRORS.same)
+      return
+    }
+    setLoading(true)
+    setError('')
+    const result = await onChange(current, next)
+    setLoading(false)
+    if (result === 'ok') {
+      setDone(true)
+      setCurrent('')
+      setNext('')
+      setConfirm('')
+      return
+    }
+    if (result === 'wrong-current') setCurrent('')
+    setError(result === 'invalid-new'
+      ? getMasterPasswordProblem(next)
+      : CHANGE_PASSWORD_ERRORS[result] || CHANGE_PASSWORD_ERRORS.failed)
+  }
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+      onKeyDown={(e) => { if (e.key === 'Escape' && !loading) onClose() }}
+    >
+      <div className="w-full max-w-md rounded-2xl bg-[#1a1a2e] border border-white/10 p-6 max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-lg font-semibold text-gray-200 flex items-center gap-2">
+            <KeyRound size={18} className="text-indigo-400" />
+            Ana Şifreyi Değiştir
+          </h3>
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
+            title="Kapat"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {done ? (
+          <div className="space-y-4">
+            <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm">
+              <Check size={16} className="shrink-0 mt-0.5" />
+              <span>Ana şifre değiştirildi. Kasayı bundan sonra yeni şifreyle açın.</span>
+            </div>
+            <p className="text-xs text-gray-500">
+              Daha önce alınmış yedekler ve dışa aktarılmış dosyalar eski şifreyle açılmaya devam eder; yeni yedekler yeni şifreyle açılır.
+            </p>
+            <button
+              onClick={onClose}
+              className="w-full py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm transition-all"
+            >
+              Kapat
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <input
+              type="password"
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+              placeholder="Mevcut ana şifre"
+              className={modalInputClass}
+              autoFocus
+            />
+            <input
+              type="password"
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+              placeholder="Yeni ana şifre"
+              className={modalInputClass}
+            />
+            {strength ? (
+              <div className="space-y-1.5">
+                <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{ width: `${((strength.score + 1) / 5) * 100}%`, backgroundColor: strength.color }}
+                  />
+                </div>
+                <span className="text-xs font-medium" style={{ color: strength.color }}>{strength.label}</span>
+                {problem && <p className="text-xs text-red-400">{problem}</p>}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500">
+                En az {MIN_MASTER_PASSWORD_LENGTH} karakter. Birkaç kelimeden oluşan bir cümle hem güçlü hem akılda kalıcıdır.
+              </p>
+            )}
+            <input
+              type="password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              placeholder="Yeni ana şifreyi tekrarla"
+              className={modalInputClass}
+            />
+            {error && <p className="text-xs text-red-400">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading || !!problem}
+              className="w-full py-3 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-sm transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50"
+            >
+              {loading ? 'Değiştiriliyor...' : 'Şifreyi Değiştir'}
+            </button>
+            <p className="text-xs text-gray-600 text-center">
+              Değişiklikten önce kasanın mevcut hali eski şifreyle yedeklenir.
+            </p>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function VaultPanel({
   passwords,
   savePasswords,
@@ -622,6 +773,7 @@ export default function VaultPanel({
   updatePassword,
   importPasswords,
   exportPasswords,
+  changeMasterPassword,
   clearAll,
   isLocked,
   isInitialized,
@@ -636,6 +788,7 @@ export default function VaultPanel({
   const [editingId, setEditingId] = useState(null)
   const [isAdding, setIsAdding] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [showChangePassword, setShowChangePassword] = useState(false)
   const { pendingDeletes, softDelete, undoDelete, clearAll: clearUndoBuffer } = useUndoDelete()
 
   // Kasa kilitlenince undo buffer'ını temizle
@@ -726,6 +879,23 @@ export default function VaultPanel({
     importPasswords(entries, mode)
   }
 
+  const changePasswordButton = (
+    <button
+      onClick={() => setShowChangePassword(true)}
+      className="flex items-center p-1.5 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white transition-all duration-200"
+      title="Ana şifreyi değiştir"
+    >
+      <KeyRound size={16} />
+    </button>
+  )
+
+  const changePasswordModal = showChangePassword && (
+    <ChangeMasterPasswordModal
+      onChange={changeMasterPassword}
+      onClose={() => setShowChangePassword(false)}
+    />
+  )
+
   // Geri al bildirimi boş kasa görünümünde de gösterilir; son kayıt silinince de geri alınabilsin
   const undoToasts = pendingDeletes.length > 0 && (
     <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-2">
@@ -762,6 +932,7 @@ export default function VaultPanel({
               <Upload size={14} />
               İçe Aktar
             </button>
+            {changePasswordButton}
             <button
               onClick={lock}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white transition-all duration-200"
@@ -790,6 +961,7 @@ export default function VaultPanel({
             savedPasswords={passwords}
           />
         )}
+        {changePasswordModal}
         {undoToasts}
       </div>
     )
@@ -821,6 +993,7 @@ export default function VaultPanel({
                 <Upload size={14} />
                 İçe Aktar
               </button>
+              {changePasswordButton}
               <button
                 onClick={lock}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white transition-all duration-200"
@@ -932,6 +1105,8 @@ export default function VaultPanel({
           savedPasswords={passwords}
         />
       )}
+
+      {changePasswordModal}
 
       {undoToasts}
     </div>

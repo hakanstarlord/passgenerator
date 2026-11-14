@@ -15,6 +15,7 @@ Güvenli ve kullanımı kolay masaüstü şifre üretici uygulaması.
 - **Çoklu üretim** — Tek seferde birden fazla şifre üretebilme
 - **Şifreli kasa** — Kayıtlı şifreler AES-GCM ile şifrelenir, PBKDF2 (600.000 iterasyon) ile anahtar türetilir
 - **Elle kayıt** — Kasaya ad, kullanıcı adı, site, şifre, kategori ve not ile kayıt eklenip düzenlenebilir; site tarayıcıda açılır
+- **Ana şifreyi değiştirme** — Mevcut şifreyle doğrulanır, kasa yeni şifreyle yeniden şifrelenir; değişiklikten önceki hal eski şifreyle yedeklenir
 - **Geçmiş** — Üretilen şifreler Windows hesabına bağlı olarak şifreli saklanır (Electron safeStorage); maks. 100 kayıt, 30 gün otomatik temizleme
 - **Pano güvenliği** — Kopyalanan şifreler 30 saniye sonra panodan otomatik temizlenir
 - **Koyu tema** — Göz yormayan karanlık arayüz

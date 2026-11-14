@@ -2,6 +2,8 @@ import { useState, useCallback, useRef } from 'react'
 import { deriveVaultKey, encryptWithKey, decryptWithKey, readSalt, hashPassword, bytesToBase64 } from '../utils/crypto'
 import { normalizeVaultEntry } from '../utils/vaultEntry'
 import { saveAutoBackup, downloadExportFile } from '../utils/exportImport'
+import { reencryptVault } from '../utils/vaultPassword'
+import { getMasterPasswordProblem } from '../utils/masterPassword'
 
 const STORAGE_KEY = 'passgen_vault'
 const BACKUP_KEY = 'passgen_vault_backup'
@@ -183,6 +185,44 @@ export default function useSavedPasswords() {
     ))
   }, [mutate])
 
+  // Ana şifreyi değiştirir. Yazma kuyruğunda çalışır, bekleyen kayıtlarla çakışmaz.
+  // Sonuç: 'ok' | 'wrong-current' | 'same' | 'invalid-new' | 'locked' | 'failed'
+  const changeMasterPassword = useCallback((currentPassword, newPassword) => {
+    const run = async () => {
+      const vaultKey = vaultKeyRef.current
+      if (!vaultKey) return 'locked'
+      if (getMasterPasswordProblem(newPassword)) return 'invalid-new'
+      if (currentPassword === newPassword) return 'same'
+
+      const stored = readRawStorage()
+      if (!stored?.data) return 'failed'
+      let result
+      try {
+        result = await reencryptVault(stored.data, currentPassword, newPassword)
+      } catch (err) {
+        return err.message === 'wrong-current' ? 'wrong-current' : 'failed'
+      }
+
+      try {
+        const count = passwordsRef.current.length
+        // Yedekler silinmez: değişiklikten önceki hal eski şifreyle bir kez daha yedeklenir
+        saveAutoBackup(stored.data, count)
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(result.vault))
+        saveAutoBackup(result.vault.data, count)
+      } catch {
+        return 'failed'
+      }
+      // Değişiklik sürerken kasa kilitlendiyse anahtarı belleğe geri koyma
+      if (vaultKeyRef.current === vaultKey) {
+        vaultKeyRef.current = { key: result.key, salt: result.salt }
+      }
+      return 'ok'
+    }
+    const result = writeQueueRef.current.then(run)
+    writeQueueRef.current = result
+    return result
+  }, [])
+
   // Güncel kasayı bellekteki anahtarla şifreleyip .passgen olarak indirir.
   // Dosya ana şifreyle açılır (salt blob'un içinde); ana şifrenin bellekte olması gerekmez.
   const exportPasswords = useCallback(async () => {
@@ -208,6 +248,7 @@ export default function useSavedPasswords() {
     updatePassword,
     importPasswords,
     restorePassword,
-    exportPasswords
+    exportPasswords,
+    changeMasterPassword
   }
 }
