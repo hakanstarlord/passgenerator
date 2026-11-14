@@ -15,6 +15,7 @@ Amaç: Tekrar eden hataları önlemek, proje kurallarını korumak.
 - **Electron 45+:** `safeStorage` için async API kullan (`isAsyncEncryptionAvailable`, `encryptStringAsync`, `decryptStringAsync` → `{ result }`). Senkron metotlar kullanımdan kalktı, Electron 46'da siliniyor.
 - **Electron 45+:** Sandbox'lı preload'da `require` yalnızca `electron` yükler; `Buffer` ve `setImmediate` yok.
 - Electron yükseltmeden önce resmi `docs/breaking-changes.md` dosyasını kullandığımız API'lere göre tara.
+- **Pakete `node_modules` girmez** (`build.files` içinde `!node_modules/**/*`): React ve lucide-react Vite ile `dist/` içine gömülür. Bu yüzden `electron/` altındaki ana süreç ve preload dosyaları yalnızca `electron` ile Node'un yerleşik modüllerini (`fs`, `path`, `buffer`…) import edebilir. Bir npm paketi gerekirse bu satırı ona göre değiştir, yoksa exe açılışta "Cannot find module" ile çöker.
 - npm 10.9.2'nin bağımlılık çözücüsü `vitest` güncellemesinde `Cannot read properties of null (reading 'edgesOut')` hatası verir; geçici çözüm `npx -y npm@11 install ...`. npm 11 kurulum betiklerini çalıştırmaz; `electron-winstaller` için `vendor/7z.exe` ve `vendor/rcedit.exe`'nin yerinde olduğunu kontrol et.
 
 ## Dil Kuralları
