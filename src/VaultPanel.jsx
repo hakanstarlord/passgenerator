@@ -5,6 +5,7 @@ import { calculateStrength, calculateEntropy } from './utils/passwordGenerator'
 import { exportVault, parseImportFile, decryptImportData } from './utils/exportImport'
 import { flagDuplicateEntries } from './utils/duplicateCheck'
 import { normalizeVaultEntry } from './utils/vaultEntry'
+import { getMasterPasswordProblem, MIN_MASTER_PASSWORD_LENGTH } from './utils/masterPassword'
 import { CATEGORIES, getCategoryLabel, getCategoryIcon } from './utils/categories'
 import useUnlockRateLimit from './hooks/useUnlockRateLimit'
 import useUndoDelete from './hooks/useUndoDelete'
@@ -244,16 +245,12 @@ function SetupView({ onSetup, needsMigration }) {
   const [loading, setLoading] = useState(false)
 
   const strength = password ? calculateStrength(password) : null
-  const isWeak = strength && strength.score < 2
+  const problem = getMasterPasswordProblem(password)
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (isWeak) {
-      setError('Ana şifre en az "Orta" güçte olmalıdır.')
-      return
-    }
-    if (password.length < 6) {
-      setError('Şifre en az 6 karakter olmalıdır.')
+    if (problem) {
+      setError(problem)
       return
     }
     if (password !== confirm) {
@@ -300,7 +297,7 @@ function SetupView({ onSetup, needsMigration }) {
             autoFocus
           />
 
-          {strength && (
+          {strength ? (
             <div className="space-y-1.5">
               <div className="h-2 rounded-full bg-white/10 overflow-hidden">
                 <div
@@ -311,15 +308,15 @@ function SetupView({ onSetup, needsMigration }) {
                   }}
                 />
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium" style={{ color: strength.color }}>
-                  {strength.label}
-                </span>
-                {isWeak && (
-                  <span className="text-xs text-red-400">En az &quot;Orta&quot; güçte olmalıdır</span>
-                )}
-              </div>
+              <span className="text-xs font-medium" style={{ color: strength.color }}>
+                {strength.label}
+              </span>
+              {problem && <p className="text-xs text-red-400">{problem}</p>}
             </div>
+          ) : (
+            <p className="text-xs text-gray-500">
+              En az {MIN_MASTER_PASSWORD_LENGTH} karakter. Birkaç kelimeden oluşan bir cümle hem güçlü hem akılda kalıcıdır.
+            </p>
           )}
 
           <input
@@ -332,7 +329,7 @@ function SetupView({ onSetup, needsMigration }) {
           {error && <p className="text-xs text-red-400">{error}</p>}
           <button
             type="submit"
-            disabled={loading || isWeak}
+            disabled={loading || !!problem}
             className="w-full py-3 rounded-xl bg-indigo-500 hover:bg-indigo-600 active:scale-[0.98] text-white font-semibold text-sm transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50"
           >
             {loading ? 'Ayarlanıyor...' : 'Kasayı Oluştur'}
