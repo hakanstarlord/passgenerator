@@ -243,8 +243,14 @@ function SetupView({ onSetup, needsMigration }) {
   const [loading, setLoading] = useState(false)
 
   const strength = password ? calculateStrength(password) : null
+  const isWeak = strength && strength.score < 2
+
   async function handleSubmit(e) {
     e.preventDefault()
+    if (isWeak) {
+      setError('Ana şifre en az "Orta" güçte olmalıdır.')
+      return
+    }
     if (password.length < 6) {
       setError('Şifre en az 6 karakter olmalıdır.')
       return
@@ -308,6 +314,9 @@ function SetupView({ onSetup, needsMigration }) {
                 <span className="text-xs font-medium" style={{ color: strength.color }}>
                   {strength.label}
                 </span>
+                {isWeak && (
+                  <span className="text-xs text-red-400">En az &quot;Orta&quot; güçte olmalıdır</span>
+                )}
               </div>
             </div>
           )}
@@ -322,7 +331,7 @@ function SetupView({ onSetup, needsMigration }) {
           {error && <p className="text-xs text-red-400">{error}</p>}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || isWeak}
             className="w-full py-3 rounded-xl bg-indigo-500 hover:bg-indigo-600 active:scale-[0.98] text-white font-semibold text-sm transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50"
           >
             {loading ? 'Ayarlanıyor...' : 'Kasayı Oluştur'}

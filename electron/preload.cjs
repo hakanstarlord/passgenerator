@@ -10,5 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   removeFullscreenListener: (handler) => {
     ipcRenderer.removeListener('fullscreen-changed', handler)
-  }
+  },
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
 })

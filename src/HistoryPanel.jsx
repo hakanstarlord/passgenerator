@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
-import { Copy, Check, Trash2, Eye, EyeOff, Search, AlertTriangle, ShieldOff } from 'lucide-react'
+import { Copy, Check, Trash2, Eye, EyeOff, Search, AlertTriangle, ShieldOff, Shield } from 'lucide-react'
 import { copyToClipboard } from './utils/clipboard'
+import { calculateEntropy } from './utils/passwordGenerator'
 
 function timeAgo(dateStr) {
   const now = Date.now()
@@ -88,6 +89,12 @@ function HistoryRow({ item, onRemove }) {
         <span className="text-xs text-gray-500">
           {activeTypes.join(', ')}
         </span>
+        {item.charTypes && (
+          <span className="flex items-center gap-1 text-xs text-gray-500 font-mono">
+            <Shield size={12} className="text-gray-600" />
+            ~{calculateEntropy(item.length, item.charTypes)} bit
+          </span>
+        )}
         <span className="text-xs text-gray-600 ml-auto">
           {timeAgo(item.date)}
         </span>

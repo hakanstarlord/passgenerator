@@ -67,3 +67,19 @@ input[type='range']::-moz-range-thumb {
 .strength-bar-fill {
   animation: strengthFill 0.6s ease-out 0.2s both;
 }
+
+/* Undo toast animation */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.25s ease-out both;
+}

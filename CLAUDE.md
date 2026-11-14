@@ -18,14 +18,16 @@ Amaç: Tekrar eden hataları önlemek, proje kurallarını korumak.
 ## Dizin Yapısı
 
 ```
-password-generator/
+passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasör yok)
 ├── build/
 │   ├── icon.png                   # Uygulama ikonu (kaynak PNG)
 │   └── icon.ico                   # Windows ikonu (exe'ye gömülür, rcedit ile)
 ├── electron/
-│   ├── main.js                    # Electron ana süreç (pencere, menü, ikon)
-│   ├── preload.cjs                # Preload script (contextBridge, fullscreen API)
+│   ├── main.js                    # Electron ana süreç (pencere, ikon, CSP, GitHub güncelleme kontrolü)
+│   ├── preload.cjs                # Preload script (contextBridge: fullscreen, güncelleme, harici URL)
 │   └── setIcon.cjs                # afterPack hook (rcedit ile exe'ye ikon gömer)
+├── scripts/
+│   └── watch-build.mjs            # Değişiklikte exe'yi yeniden derler (npm run electron:watch)
 ├── public/
 │   ├── favicon.svg                # Tarayıcı favicon
 │   └── icon.png                   # Uygulama ikonu (UI içinde kullanılır)
@@ -40,13 +42,16 @@ password-generator/
 │   │   ├── usePasswordHistory.js  # Geçmiş hook (boyut sınırlı, otomatik temizleme)
 │   │   ├── useSavedPasswords.js   # Kasa hook (AES-GCM şifreli, kilit/açma, düzenleme, içe/dışa aktarma)
 │   │   ├── useUnlockRateLimit.js  # Kasa açma deneme sınırlaması (5→30sn, 10→5dk)
-│   │   └── useAutoLock.js         # Otomatik kilit (5dk hareketsizlik, 30sn uyarı)
+│   │   ├── useAutoLock.js         # Otomatik kilit (5dk hareketsizlik, 30sn uyarı)
+│   │   └── useUndoDelete.js       # Kasada silmeyi geri alma (7 sn, en fazla 5 kayıt)
 │   └── utils/
-│       ├── passwordGenerator.js   # generatePassword, calculateStrength
+│       ├── passwordGenerator.js   # generatePassword, calculateStrength, calculateEntropy
 │       ├── clipboard.js           # copyToClipboard (30 sn otomatik temizleme)
 │       ├── crypto.js              # AES-GCM şifreleme/çözme, PBKDF2 anahtar türetme
 │       ├── duplicateCheck.js      # Kasada duplikasyon tespiti
-│       └── exportImport.js        # Kasa dışa/içe aktarma (.passgen dosya formatı)
+│       ├── exportImport.js        # Kasa dışa/içe aktarma (.passgen dosya formatı)
+│       ├── categories.js          # Kasa kategorileri (etiket, ikon, normalizeCategory)
+│       └── __tests__/             # Vitest birim testleri (utils/ için)
 ├── release/                       # Electron build çıktısı (git-ignore)
 ```
 
@@ -76,7 +81,7 @@ password-generator/
 - State `App.jsx`'te tutulur, child bileşenlere prop olarak geçilir.
 - `GeneratorPanel` → `onGenerate` callback ile geçmişe yazar. Kasaya kaydedilen şifreler geçmişe eklenmez.
 - `HistoryPanel` → `removeFromHistory`, `clearHistory` prop'larını alır.
-- `VaultPanel` → `unlock`, `lock`, `setupMasterPassword`, `removePassword`, `updatePassword`, `importPasswords`, `getMasterPassword`, `clearAll` prop'larını alır.
+- `VaultPanel` → `unlock`, `lock`, `setupMasterPassword`, `removePassword`, `restorePassword`, `updatePassword`, `importPasswords`, `getMasterPassword`, `clearAll` prop'larını alır.
 - `GeneratorPanel` → `savedPasswords` prop'u ile duplikasyon kontrolü yapar.
 - localStorage anahtarları: `passgen_history` (geçmiş), `passgen_vault` (kasa, şifreli)
 
@@ -126,9 +131,12 @@ password-generator/
 npm run dev            # Geliştirme sunucusu (web)
 npm run build          # Production derleme (web)
 npm run lint           # ESLint kontrolü
+npm test               # Vitest birim testleri (tek sefer)
+npm run test:watch     # Vitest izleme modu
 npm run preview        # Production önizleme (web)
 npm run electron:dev   # Electron ile hızlı test (build + aç)
 npm run electron:build # Portable exe oluştur (release/ altına)
+npm run electron:watch # Değişiklikte exe'yi otomatik yeniden derle
 ```
 
 ## Sık Yapılan Hatalar — YAPMA
