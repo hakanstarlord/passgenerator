@@ -66,9 +66,10 @@ function createWindow() {
   win.loadFile(join(app.getAppPath(), 'dist', 'index.html'))
 }
 
-// GitHub repo — kullanıcı tarafından ayarlanacak
-const GITHUB_OWNER = 'hakanbugracerit'
-const GITHUB_REPO = 'password-generator'
+// Güncelleme kontrolü bu reponun son GitHub Release'ine bakar (etiket ör. v1.1.0).
+// Release yoksa API 404 döner ve hiçbir şey gösterilmez.
+const GITHUB_OWNER = 'hakanstarlord'
+const GITHUB_REPO = 'passgenerator'
 
 function checkForUpdates() {
   return new Promise((resolve) => {
