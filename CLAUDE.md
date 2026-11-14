@@ -82,7 +82,8 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 - `GeneratorPanel` → `onGenerate` callback ile geçmişe yazar. Kasaya kaydedilen şifreler geçmişe eklenmez.
 - `HistoryPanel` → `removeFromHistory`, `clearHistory` prop'larını alır.
 - `VaultPanel` → `unlock`, `lock`, `setupMasterPassword`, `removePassword`, `restorePassword`, `updatePassword`, `importPasswords`, `getMasterPassword`, `clearAll` prop'larını alır.
-- `GeneratorPanel` → `savedPasswords` prop'u ile duplikasyon kontrolü yapar.
+- `GeneratorPanel` → `savedPasswords` prop'u ile duplikasyon kontrolü yapar. Kasaya `onSaveToVault(entries)` ile tek seferde toplu yazar ve sonucu bekler.
+- **Kasa yazmaları sıralıdır:** `useSavedPasswords` içindeki her değişiklik `mutate(prev => next)` ile sıraya alınır. Yeni kasa işlemi eklerken `next` listesini `savedPasswords` state'inden hesaplama — art arda çağrılarda eski liste kullanılır ve kayıtlar kaybolur.
 - localStorage anahtarları: `passgen_history` (geçmiş), `passgen_vault` (kasa, şifreli)
 
 ## Güvenlik

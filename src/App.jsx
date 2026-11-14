@@ -22,7 +22,7 @@ function App() {
   const {
     savedPasswords, isLocked, isInitialized, needsMigration,
     unlock, lock, setupMasterPassword,
-    savePassword, removePassword, clearAll: clearVault,
+    savePasswords, removePassword, clearAll: clearVault,
     updatePassword, importPasswords, restorePassword, getMasterPassword
   } = useSavedPasswords()
 
@@ -135,7 +135,7 @@ function App() {
           {activeTab === 'generate' && (
             <GeneratorPanel
               onGenerate={addToHistory}
-              onSaveToVault={savePassword}
+              onSaveToVault={savePasswords}
               isVaultLocked={isLocked}
               savedPasswords={savedPasswords}
             />

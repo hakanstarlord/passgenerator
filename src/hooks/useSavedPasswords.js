@@ -23,6 +23,10 @@ export default function useSavedPasswords() {
   const [savedPasswords, setSavedPasswords] = useState([])
   const [isLocked, setIsLocked] = useState(true)
   const masterPasswordRef = useRef(null)
+  // Kasaya en son yazılmış liste; her değişiklik bunun üzerinden hesaplanır
+  const passwordsRef = useRef([])
+  // Kasa yazmaları sırayla çalışır, böylece art arda gelen değişiklikler birbirini ezmez
+  const writeQueueRef = useRef(Promise.resolve())
 
   const stored = readRawStorage()
   const hasLegacy = isLegacyData(stored)
@@ -40,6 +44,31 @@ export default function useSavedPasswords() {
       data
     }))
   }, [])
+
+  // Değişikliği sıraya ekler. `updater` bir önceki yazma bittikten sonra, kasadaki
+  // güncel liste ile çağrılır. Bellekteki liste yalnızca yazma başarılı olursa güncellenir.
+  const mutate = useCallback((updater) => {
+    const run = async () => {
+      const password = masterPasswordRef.current
+      if (!password) return false
+      let next
+      try {
+        next = updater(passwordsRef.current)
+        await persistEncrypted(next, password)
+      } catch {
+        return false
+      }
+      // Yazma sürerken kasa kilitlendiyse çözülmüş listeyi belleğe geri yükleme
+      if (masterPasswordRef.current === password) {
+        passwordsRef.current = next
+        setSavedPasswords(next)
+      }
+      return true
+    }
+    const result = writeQueueRef.current.then(run)
+    writeQueueRef.current = result
+    return result
+  }, [persistEncrypted])
 
   const setupMasterPassword = useCallback(async (password) => {
     const salt = crypto.getRandomValues(new Uint8Array(16))
@@ -70,6 +99,7 @@ export default function useSavedPasswords() {
     }
 
     masterPasswordRef.current = password
+    passwordsRef.current = initialPasswords
     setSavedPasswords(initialPasswords)
     setIsLocked(false)
   }, [needsMigration, stored])
@@ -87,6 +117,7 @@ export default function useSavedPasswords() {
       const plaintext = await decrypt(stored.data, password)
       const passwords = JSON.parse(plaintext).map(normalizeCategory)
       masterPasswordRef.current = password
+      passwordsRef.current = passwords
       setSavedPasswords(passwords)
       setIsLocked(false)
       return true
@@ -97,34 +128,25 @@ export default function useSavedPasswords() {
 
   const lock = useCallback(() => {
     masterPasswordRef.current = null
+    passwordsRef.current = []
     setSavedPasswords([])
     setIsLocked(true)
   }, [])
 
-  const savePassword = useCallback(async (entry) => {
-    if (isLocked || !masterPasswordRef.current) return false
-    const next = [entry, ...savedPasswords]
-    await persistEncrypted(next, masterPasswordRef.current)
-    setSavedPasswords(next)
-    return true
-  }, [isLocked, savedPasswords, persistEncrypted])
+  const savePasswords = useCallback((entries) => {
+    return mutate((prev) => [...entries, ...prev])
+  }, [mutate])
 
-  const removePassword = useCallback(async (id) => {
-    if (isLocked || !masterPasswordRef.current) return
-    const next = savedPasswords.filter((item) => item.id !== id)
-    await persistEncrypted(next, masterPasswordRef.current)
-    setSavedPasswords(next)
-  }, [isLocked, savedPasswords, persistEncrypted])
+  const removePassword = useCallback((id) => {
+    return mutate((prev) => prev.filter((item) => item.id !== id))
+  }, [mutate])
 
-  const clearAll = useCallback(async () => {
-    if (isLocked || !masterPasswordRef.current) return
-    await persistEncrypted([], masterPasswordRef.current)
-    setSavedPasswords([])
-  }, [isLocked, persistEncrypted])
+  const clearAll = useCallback(() => {
+    return mutate(() => [])
+  }, [mutate])
 
-  const updatePassword = useCallback(async (id, updates) => {
-    if (isLocked || !masterPasswordRef.current) return
-    const next = savedPasswords.map(item => {
+  const updatePassword = useCallback((id, updates) => {
+    return mutate((prev) => prev.map(item => {
       if (item.id !== id) return item
       const updated = { ...item, ...updates }
       if (updates.password && updates.password !== item.password) {
@@ -132,34 +154,27 @@ export default function useSavedPasswords() {
         updated.length = updates.password.length
       }
       return updated
-    })
-    await persistEncrypted(next, masterPasswordRef.current)
-    setSavedPasswords(next)
-  }, [isLocked, savedPasswords, persistEncrypted])
+    }))
+  }, [mutate])
 
-  const importPasswords = useCallback(async (entries, mode) => {
-    if (isLocked || !masterPasswordRef.current) return
-    let next
-    if (mode === 'replace') {
-      next = entries.map(e => normalizeCategory({ ...e, id: crypto.randomUUID() }))
-    } else {
-      const existingPasswords = new Set(savedPasswords.map(p => p.password))
+  const importPasswords = useCallback((entries, mode) => {
+    return mutate((prev) => {
+      if (mode === 'replace') {
+        return entries.map(e => normalizeCategory({ ...e, id: crypto.randomUUID() }))
+      }
+      const existingPasswords = new Set(prev.map(p => p.password))
       const newEntries = entries
         .filter(e => !existingPasswords.has(e.password))
         .map(e => normalizeCategory({ ...e, id: crypto.randomUUID() }))
-      next = [...savedPasswords, ...newEntries]
-    }
-    await persistEncrypted(next, masterPasswordRef.current)
-    setSavedPasswords(next)
-  }, [isLocked, savedPasswords, persistEncrypted])
+      return [...prev, ...newEntries]
+    })
+  }, [mutate])
 
-  const restorePassword = useCallback(async (entry) => {
-    if (isLocked || !masterPasswordRef.current) return false
-    const next = [entry, ...savedPasswords]
-    await persistEncrypted(next, masterPasswordRef.current)
-    setSavedPasswords(next)
-    return true
-  }, [isLocked, savedPasswords, persistEncrypted])
+  const restorePassword = useCallback((entry) => {
+    return mutate((prev) => (
+      prev.some((item) => item.id === entry.id) ? prev : [entry, ...prev]
+    ))
+  }, [mutate])
 
   const getMasterPassword = useCallback(() => {
     return masterPasswordRef.current
@@ -173,7 +188,7 @@ export default function useSavedPasswords() {
     unlock,
     lock,
     setupMasterPassword,
-    savePassword,
+    savePasswords,
     removePassword,
     clearAll,
     updatePassword,

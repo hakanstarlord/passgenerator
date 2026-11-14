@@ -7,22 +7,22 @@ const THROTTLE_MS = 1000
 export default function useAutoLock(isLocked, lock) {
   const [showWarning, setShowWarning] = useState(false)
   const [remainingSeconds, setRemainingSeconds] = useState(0)
-  const lastActivityRef = useRef(Date.now())
+  // Effect içindeki startTimers() gerçek zamanı yazar; render sırasında Date.now() çağrılmaz
+  const lastActivityRef = useRef(0)
   const warningTimerRef = useRef(null)
   const lockTimerRef = useRef(null)
   const countdownRef = useRef(null)
   const throttleRef = useRef(0)
   const lockRef = useRef(lock)
-  lockRef.current = lock
+
+  // Zamanlayıcılar her zaman güncel lock fonksiyonunu çağırsın (render sırasında ref'e yazılmaz)
+  useEffect(() => {
+    lockRef.current = lock
+  }, [lock])
 
   useEffect(() => {
-    if (isLocked) {
-      clearTimeout(warningTimerRef.current)
-      clearTimeout(lockTimerRef.current)
-      clearInterval(countdownRef.current)
-      setShowWarning(false)
-      return
-    }
+    // Kilitliyken zamanlayıcı yok; açıkken kurulanlar aşağıdaki cleanup'ta temizlenir
+    if (isLocked) return
 
     function clearAllTimers() {
       clearTimeout(warningTimerRef.current)
@@ -36,7 +36,6 @@ export default function useAutoLock(isLocked, lock) {
     function startTimers() {
       clearAllTimers()
       lastActivityRef.current = Date.now()
-      setShowWarning(false)
 
       warningTimerRef.current = setTimeout(() => {
         setShowWarning(true)
@@ -59,6 +58,7 @@ export default function useAutoLock(isLocked, lock) {
       const now = Date.now()
       if (now - throttleRef.current < THROTTLE_MS) return
       throttleRef.current = now
+      setShowWarning(false)
       startTimers()
     }
 
@@ -72,6 +72,8 @@ export default function useAutoLock(isLocked, lock) {
       events.forEach(event => window.removeEventListener(event, handleActivity))
       window.removeEventListener('focus', handleActivity)
       clearAllTimers()
+      // Elle kilitlenince uyarı açık kalmasın, bir sonraki açılışta görünmesin
+      setShowWarning(false)
     }
   }, [isLocked])
 

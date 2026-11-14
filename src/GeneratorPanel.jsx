@@ -125,7 +125,8 @@ export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocke
   const [vaultName, setVaultName] = useState('')
   const [vaultCategory, setVaultCategory] = useState('other')
   const [savedToVault, setSavedToVault] = useState(false)
-  const [vaultWarning, setVaultWarning] = useState(false)
+  const [vaultWarning, setVaultWarning] = useState(null)
+  const [isSavingToVault, setIsSavingToVault] = useState(false)
   const [duplicateWarning, setDuplicateWarning] = useState(null)
   const [pendingVaultEntries, setPendingVaultEntries] = useState(null)
   const activeCount = Object.values(charTypes).filter(Boolean).length
@@ -148,6 +149,25 @@ export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocke
   function toggleCharType(id) {
     if (charTypes[id] && activeCount <= 1) return
     setCharTypes((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  function showVaultWarning(message) {
+    setVaultWarning(message)
+    setTimeout(() => setVaultWarning(null), 3000)
+  }
+
+  async function saveToVault(entries) {
+    setIsSavingToVault(true)
+    const saved = await onSaveToVault?.(entries)
+    setIsSavingToVault(false)
+    if (!saved) {
+      showVaultWarning('Şifre kasaya kaydedilemedi. Sonuçlardan kopyalayıp tekrar deneyin.')
+      return
+    }
+    setSavedToVault(true)
+    setTimeout(() => setSavedToVault(false), 2000)
+    setVaultName('')
+    setVaultCategory('other')
   }
 
   function handleGenerate() {
@@ -177,8 +197,7 @@ export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocke
 
     if (vaultName.trim()) {
       if (isVaultLocked) {
-        setVaultWarning(true)
-        setTimeout(() => setVaultWarning(false), 3000)
+        showVaultWarning('Kasa kilitli — kaydetmek için önce kasanın kilidini açın.')
       } else {
         const vaultEntries = generated.map((pw, i) => ({
           id: crypto.randomUUID(),
@@ -200,24 +219,17 @@ export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocke
           setDuplicateWarning({ duplicateName })
           setPendingVaultEntries(vaultEntries)
         } else {
-          vaultEntries.forEach(entry => onSaveToVault?.(entry))
-          setSavedToVault(true)
-          setTimeout(() => setSavedToVault(false), 2000)
-          setVaultName('')
-          setVaultCategory('other')
+          saveToVault(vaultEntries)
         }
       }
     }
   }
 
   function handleSaveDuplicate() {
-    pendingVaultEntries?.forEach(entry => onSaveToVault?.(entry))
-    setSavedToVault(true)
-    setTimeout(() => setSavedToVault(false), 2000)
-    setVaultName('')
-    setVaultCategory('other')
+    const entries = pendingVaultEntries
     setDuplicateWarning(null)
     setPendingVaultEntries(null)
+    if (entries) saveToVault(entries)
   }
 
   function handleCancelDuplicate() {
@@ -384,10 +396,11 @@ export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocke
       {/* Generate button */}
       <button
         onClick={handleGenerate}
-        className="w-full py-3.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 active:scale-[0.98] text-white font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-500/25"
+        disabled={isSavingToVault}
+        className="w-full py-3.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 active:scale-[0.98] text-white font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Sparkles size={18} />
-        Şifre Oluştur
+        {isSavingToVault ? 'Kasaya kaydediliyor...' : 'Şifre Oluştur'}
       </button>
 
       {savedToVault && (
@@ -398,7 +411,7 @@ export default function GeneratorPanel({ onGenerate, onSaveToVault, isVaultLocke
 
       {vaultWarning && (
         <div className="mt-3 text-center text-sm text-amber-400 font-medium animate-pulse">
-          Kasa kilitli — kaydetmek için önce kasanın kilidini açın.
+          {vaultWarning}
         </div>
       )}
 

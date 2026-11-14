@@ -708,6 +708,29 @@ export default function VaultPanel({
     importPasswords(entries, mode)
   }
 
+  // Geri al bildirimi boş kasa görünümünde de gösterilir; son kayıt silinince de geri alınabilsin
+  const undoToasts = pendingDeletes.length > 0 && (
+    <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-2">
+      {pendingDeletes.map(({ item, remainingSeconds }) => (
+        <div
+          key={item.id}
+          className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#1a1a2e] border border-white/10 shadow-xl shadow-black/30 animate-slide-up"
+        >
+          <span className="text-sm text-gray-300 max-w-[200px] truncate">
+            &ldquo;{item.name}&rdquo; silindi
+          </span>
+          <button
+            onClick={() => handleUndo(item.id)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 transition-all shrink-0"
+          >
+            <Undo2 size={12} />
+            Geri Al ({remainingSeconds}s)
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+
   if (passwords.length === 0) {
     return (
       <div className="max-w-xl">
@@ -746,6 +769,7 @@ export default function VaultPanel({
             savedPasswords={passwords}
           />
         )}
+        {undoToasts}
       </div>
     )
   }
@@ -885,28 +909,7 @@ export default function VaultPanel({
         />
       )}
 
-      {/* Undo toast */}
-      {pendingDeletes.length > 0 && (
-        <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-2">
-          {pendingDeletes.map(({ item, remainingSeconds }) => (
-            <div
-              key={item.id}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#1a1a2e] border border-white/10 shadow-xl shadow-black/30 animate-slide-up"
-            >
-              <span className="text-sm text-gray-300 max-w-[200px] truncate">
-                &ldquo;{item.name}&rdquo; silindi
-              </span>
-              <button
-                onClick={() => handleUndo(item.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 transition-all shrink-0"
-              >
-                <Undo2 size={12} />
-                Geri Al ({remainingSeconds}s)
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      {undoToasts}
     </div>
   )
 }
