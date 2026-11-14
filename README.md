@@ -14,7 +14,7 @@ Güvenli ve kullanımı kolay masaüstü şifre üretici uygulaması.
 - **Güçlük göstergesi** — Üretilen şifrenin güçlük seviyesini anlık olarak gösterir
 - **Çoklu üretim** — Tek seferde birden fazla şifre üretebilme
 - **Şifreli kasa** — Kayıtlı şifreler AES-GCM ile şifrelenir, PBKDF2 (600.000 iterasyon) ile anahtar türetilir
-- **Geçmiş** — Üretilen şifreler localStorage'da saklanır (maks. 100 kayıt, 30 gün otomatik temizleme)
+- **Geçmiş** — Üretilen şifreler Windows hesabına bağlı olarak şifreli saklanır (Electron safeStorage); maks. 100 kayıt, 30 gün otomatik temizleme
 - **Pano güvenliği** — Kopyalanan şifreler 30 saniye sonra panodan otomatik temizlenir
 - **Koyu tema** — Göz yormayan karanlık arayüz
 - **Masaüstü uygulaması** — Electron ile Windows portable exe olarak dağıtılabilir

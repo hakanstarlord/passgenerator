@@ -18,7 +18,7 @@ function App() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [updateInfo, setUpdateInfo] = useState(null)
   const [updateDismissed, setUpdateDismissed] = useState(false)
-  const { history, addToHistory, removeFromHistory, clearHistory } = usePasswordHistory()
+  const { history, isLoaded: isHistoryLoaded, addToHistory, removeFromHistory, clearHistory } = usePasswordHistory()
   const {
     savedPasswords, isLocked, isInitialized, needsMigration,
     unlock, lock, setupMasterPassword,
@@ -160,6 +160,7 @@ function App() {
           {activeTab === 'history' && (
             <HistoryPanel
               history={history}
+              isLoaded={isHistoryLoaded}
               removeFromHistory={removeFromHistory}
               clearHistory={clearHistory}
             />

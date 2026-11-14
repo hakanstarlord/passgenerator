@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, session, net, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, session, net, shell, safeStorage } from 'electron'
+import { Buffer } from 'buffer'
 import { join } from 'path'
 import { readFileSync } from 'fs'
 import { mkdir } from 'fs/promises'
@@ -121,6 +122,29 @@ function compareVersions(a, b) {
   return 0
 }
 
+const MAX_PROTECTED_LENGTH = 5 * 1024 * 1024
+
+// Metni Windows hesabına bağlı anahtarla (DPAPI) şifreler; kullanılamıyorsa null
+function protectText(text) {
+  if (typeof text !== 'string' || text.length > MAX_PROTECTED_LENGTH) return null
+  if (!safeStorage.isEncryptionAvailable()) return null
+  try {
+    return safeStorage.encryptString(text).toString('base64')
+  } catch {
+    return null
+  }
+}
+
+function unprotectText(encoded) {
+  if (typeof encoded !== 'string' || encoded.length > MAX_PROTECTED_LENGTH * 2) return null
+  if (!safeStorage.isEncryptionAvailable()) return null
+  try {
+    return safeStorage.decryptString(Buffer.from(encoded, 'base64'))
+  } catch {
+    return null
+  }
+}
+
 function getBackupDir() {
   return join(app.getPath('userData'), BACKUP_DIR_NAME)
 }
@@ -150,6 +174,10 @@ app.whenReady().then(() => {
       return false
     }
   })
+
+  // IPC: geçmiş gibi verileri diske düz metin yazmadan saklamak için (safeStorage)
+  ipcMain.handle('secure:protect', (_, text) => protectText(text))
+  ipcMain.handle('secure:unprotect', (_, encoded) => unprotectText(encoded))
 
   // IPC: yedek klasörünü dosya gezgininde aç
   ipcMain.handle('vault:open-backups', async () => {

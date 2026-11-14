@@ -1,53 +1,55 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { loadHistory, saveHistory, pruneHistory, getSecureBridge } from '../utils/historyStorage'
 
-const STORAGE_KEY = 'passgen_history'
-const MAX_HISTORY_SIZE = 100
-const MAX_AGE_DAYS = 30
-
-function readStorage() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return []
-    const data = JSON.parse(raw)
-    // 30 günden eski kayıtları otomatik temizle
-    const cutoff = Date.now() - MAX_AGE_DAYS * 86400000
-    const filtered = data.filter((item) => new Date(item.date).getTime() > cutoff)
-    if (filtered.length !== data.length) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered))
-    }
-    return filtered
-  } catch {
-    return []
-  }
-}
-
-function writeStorage(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-}
-
+// Geçmiş diskte safeStorage ile şifreli saklanır (bkz. utils/historyStorage.js).
+// Değişiklikler sıraya alınır ve açılıştaki yükleme bitince başlar; böylece hiçbiri kaybolmaz.
 export default function usePasswordHistory() {
-  const [history, setHistory] = useState(readStorage)
+  const [history, setHistory] = useState([])
+  const [isLoaded, setIsLoaded] = useState(false)
+  const historyRef = useRef([])
+  const queueRef = useRef(Promise.resolve())
+
+  useEffect(() => {
+    let active = true
+    const loading = loadHistory({ storage: localStorage, ...getSecureBridge() })
+      .catch(() => [])
+      .then((entries) => {
+        if (!active) return
+        historyRef.current = entries
+        setHistory(entries)
+        setIsLoaded(true)
+      })
+    queueRef.current = loading
+    return () => { active = false }
+  }, [])
+
+  const mutate = useCallback((updater) => {
+    const run = async () => {
+      const next = pruneHistory(updater(historyRef.current))
+      historyRef.current = next
+      setHistory(next)
+      try {
+        await saveHistory(next, { storage: localStorage, protect: getSecureBridge().protect })
+      } catch {
+        // Şifreli yazma başarısızsa geçmiş bu oturumda bellekte kalır
+      }
+    }
+    const result = queueRef.current.then(run)
+    queueRef.current = result.catch(() => {})
+    return result
+  }, [])
 
   const addToHistory = useCallback((entries) => {
-    setHistory((prev) => {
-      const next = [...entries, ...prev].slice(0, MAX_HISTORY_SIZE)
-      writeStorage(next)
-      return next
-    })
-  }, [])
+    return mutate((prev) => [...entries, ...prev])
+  }, [mutate])
 
   const removeFromHistory = useCallback((id) => {
-    setHistory((prev) => {
-      const next = prev.filter((item) => item.id !== id)
-      writeStorage(next)
-      return next
-    })
-  }, [])
+    return mutate((prev) => prev.filter((item) => item.id !== id))
+  }, [mutate])
 
   const clearHistory = useCallback(() => {
-    writeStorage([])
-    setHistory([])
-  }, [])
+    return mutate(() => [])
+  }, [mutate])
 
-  return { history, addToHistory, removeFromHistory, clearHistory }
+  return { history, isLoaded, addToHistory, removeFromHistory, clearHistory }
 }

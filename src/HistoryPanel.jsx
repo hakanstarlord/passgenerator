@@ -103,7 +103,7 @@ function HistoryRow({ item, onRemove }) {
   )
 }
 
-export default function HistoryPanel({ history, removeFromHistory, clearHistory }) {
+export default function HistoryPanel({ history, isLoaded = true, removeFromHistory, clearHistory }) {
   const [search, setSearch] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
 
@@ -114,6 +114,15 @@ export default function HistoryPanel({ history, removeFromHistory, clearHistory 
   function handleClearAll() {
     clearHistory()
     setShowConfirm(false)
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="max-w-xl">
+        <h1 className="text-2xl font-bold mb-6">Geçmiş</h1>
+        <p className="text-gray-500 text-sm">Geçmiş yükleniyor...</p>
+      </div>
+    )
   }
 
   if (history.length === 0) {

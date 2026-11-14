@@ -24,7 +24,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 │   └── icon.ico                   # Windows ikonu (exe'ye gömülür, rcedit ile)
 ├── electron/
 │   ├── main.js                    # Electron ana süreç (pencere, ikon, CSP, GitHub güncelleme kontrolü)
-│   ├── preload.cjs                # Preload script (contextBridge: fullscreen, güncelleme, harici URL, kasa yedeği)
+│   ├── preload.cjs                # Preload script (contextBridge: fullscreen, güncelleme, harici URL, kasa yedeği, safeStorage)
 │   ├── backups.js                 # Kasa yedeği adı ve doğrulama (saf fonksiyonlar, test edilir)
 │   ├── __tests__/                 # Vitest testleri (exe'ye paketlenmez)
 │   └── setIcon.cjs                # afterPack hook (rcedit ile exe'ye ikon gömer)
@@ -41,7 +41,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 │   ├── main.jsx                   # React giriş noktası
 │   ├── index.css                  # Tailwind + özel animasyonlar
 │   ├── hooks/
-│   │   ├── usePasswordHistory.js  # Geçmiş hook (boyut sınırlı, otomatik temizleme)
+│   │   ├── usePasswordHistory.js  # Geçmiş hook (safeStorage ile şifreli, boyut sınırlı, otomatik temizleme)
 │   │   ├── useSavedPasswords.js   # Kasa hook (AES-GCM şifreli, kilit/açma, düzenleme, içe/dışa aktarma)
 │   │   ├── useUnlockRateLimit.js  # Kasa açma deneme sınırlaması (5→30sn, 10→5dk)
 │   │   ├── useAutoLock.js         # Otomatik kilit (5dk hareketsizlik, 30sn uyarı)
@@ -54,6 +54,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 │       ├── exportImport.js        # Kasa dışa/içe aktarma (.passgen dosya formatı)
 │       ├── categories.js          # Kasa kategorileri (etiket, ikon, normalizeCategory)
 │       ├── vaultEntry.js          # normalizeVaultEntry: eksik alanları şifreden tamamlar
+│       ├── historyStorage.js      # Geçmişi safeStorage ile şifreli okur/yazar (düz metin yazmaz)
 │       └── __tests__/             # Vitest birim testleri (utils/ için)
 ├── release/                       # Electron build çıktısı (git-ignore)
 ```
@@ -88,7 +89,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 - `GeneratorPanel` → `savedPasswords` prop'u ile duplikasyon kontrolü yapar. Kasaya `onSaveToVault(entries)` ile tek seferde toplu yazar ve sonucu bekler.
 - **Kasa yazmaları sıralıdır:** `useSavedPasswords` içindeki her değişiklik `mutate(prev => next)` ile sıraya alınır. Yeni kasa işlemi eklerken `next` listesini `savedPasswords` state'inden hesaplama — art arda çağrılarda eski liste kullanılır ve kayıtlar kaybolur.
 - **Dışarıdan gelen kayıtlar normalleştirilir:** İçe aktarma, kilit açma ve migrasyonda her kayıt `normalizeVaultEntry` ile tamamlanır (eksik `charTypes`, `strength`, `length`, `date`, `name`, `id` şifreden/varsayılandan üretilir; bilinmeyen alanlar korunur). Şifresi olmayan kayıtlar atlanır ve içe aktarma önizlemesinde sayısı gösterilir. Hiç geçerli kayıt yoksa içe aktarma butonu kapalıdır.
-- localStorage anahtarları: `passgen_history` (geçmiş), `passgen_vault` (kasa, şifreli)
+- localStorage anahtarları: `passgen_history` (geçmiş, safeStorage ile şifreli), `passgen_vault` (kasa, şifreli)
 
 ## Güvenlik
 
@@ -99,7 +100,8 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 - Pano kopyalamalarında `copyToClipboard()` kullan — 30 saniye sonra pano otomatik temizlenir.
 - Kasa verileri AES-GCM ile şifrelenir, anahtar PBKDF2 (SHA-256, 600.000 iterasyon) ile türetilir.
 - Electron: CSP header aktif, sandbox aktif, dış URL navigasyonu ve popup'lar engelli.
-- Geçmiş en fazla 100 kayıt tutar, 30 günden eski kayıtlar otomatik temizlenir.
+- Geçmiş en fazla 100 kayıt tutar, 30 günden eski kayıtlar otomatik temizlenir (kullanıcı bu kuralın kalmasını seçti).
+- Geçmiş diske **düz metin yazılmaz**: `passgen_history` değeri `{ version: 2, protected }` biçiminde Electron `safeStorage` (Windows DPAPI) ile şifrelidir (`secure:protect` / `secure:unprotect` IPC, `src/utils/historyStorage.js`). Eski düz dizi biçimi ilk açılışta şifreli biçime çevrilir. safeStorage yoksa (web modu) geçmiş yalnızca bellekte tutulur. Çözülemeyen veri silinmez, `passgen_history_unreadable` anahtarına kopyalanır.
 - Master şifre belirleme: minimum güç skoru >= 2 ("Orta") zorunlu.
 - Kasa açma deneme sınırlaması: 5 başarısız → 30sn, 10 başarısız → 5dk bekleme (`sessionStorage`).
 - Otomatik kilit: 5dk hareketsizlikte kasa kilitlenir, 30sn önce uyarı banner'ı gösterilir.
