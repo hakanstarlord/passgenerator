@@ -1,8 +1,8 @@
 import { useState, useCallback, useRef } from 'react'
-import { encrypt, decrypt, hashPassword } from '../utils/crypto'
+import { deriveVaultKey, encryptWithKey, decryptWithKey, readSalt, hashPassword, bytesToBase64 } from '../utils/crypto'
 import { calculateStrength } from '../utils/passwordGenerator'
 import { normalizeVaultEntry } from '../utils/vaultEntry'
-import { saveAutoBackup } from '../utils/exportImport'
+import { saveAutoBackup, downloadExportFile } from '../utils/exportImport'
 
 const STORAGE_KEY = 'passgen_vault'
 const BACKUP_KEY = 'passgen_vault_backup'
@@ -28,7 +28,9 @@ function toVaultEntries(list) {
 export default function useSavedPasswords() {
   const [savedPasswords, setSavedPasswords] = useState([])
   const [isLocked, setIsLocked] = useState(true)
-  const masterPasswordRef = useRef(null)
+  // Ana şifre bellekte tutulmaz: kilit açılışında bir kez türetilen, dışa aktarılamaz
+  // AES-GCM anahtarı ve kasa salt'ı tutulur ({ key, salt }); kilitliyken null
+  const vaultKeyRef = useRef(null)
   // Kasaya en son yazılmış liste; her değişiklik bunun üzerinden hesaplanır
   const passwordsRef = useRef([])
   // Kasa yazmaları sırayla çalışır, böylece art arda gelen değişiklikler birbirini ezmez
@@ -39,10 +41,10 @@ export default function useSavedPasswords() {
   const isInitialized = !!(stored && !hasLegacy && stored.version === 2)
   const needsMigration = hasLegacy && stored.length > 0
 
-  const persistEncrypted = useCallback(async (passwords, password) => {
+  const persistEncrypted = useCallback(async (passwords, vaultKey) => {
     const stored = readRawStorage()
     const plaintext = JSON.stringify(passwords)
-    const data = await encrypt(plaintext, password)
+    const data = await encryptWithKey(plaintext, vaultKey.key, vaultKey.salt)
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       version: 2,
       passwordHash: stored?.passwordHash,
@@ -57,17 +59,17 @@ export default function useSavedPasswords() {
   // güncel liste ile çağrılır. Bellekteki liste yalnızca yazma başarılı olursa güncellenir.
   const mutate = useCallback((updater) => {
     const run = async () => {
-      const password = masterPasswordRef.current
-      if (!password) return false
+      const vaultKey = vaultKeyRef.current
+      if (!vaultKey) return false
       let next
       try {
         next = updater(passwordsRef.current)
-        await persistEncrypted(next, password)
+        await persistEncrypted(next, vaultKey)
       } catch {
         return false
       }
       // Yazma sürerken kasa kilitlendiyse çözülmüş listeyi belleğe geri yükleme
-      if (masterPasswordRef.current === password) {
+      if (vaultKeyRef.current === vaultKey) {
         passwordsRef.current = next
         setSavedPasswords(next)
       }
@@ -79,9 +81,11 @@ export default function useSavedPasswords() {
   }, [persistEncrypted])
 
   const setupMasterPassword = useCallback(async (password) => {
-    const salt = crypto.getRandomValues(new Uint8Array(16))
-    const saltB64 = btoa(String.fromCharCode(...salt))
-    const pwHash = await hashPassword(password, salt)
+    // passwordHash yalnızca eski sürümlerle uyumluluk için yazılır; kilit açma GCM doğrulamasına dayanır
+    const hashSalt = crypto.getRandomValues(new Uint8Array(16))
+    const pwHash = await hashPassword(password, hashSalt)
+    const vaultSalt = crypto.getRandomValues(new Uint8Array(16))
+    const key = await deriveVaultKey(password, vaultSalt)
 
     let initialPasswords = []
 
@@ -92,12 +96,12 @@ export default function useSavedPasswords() {
     }
 
     const plaintext = JSON.stringify(initialPasswords)
-    const data = await encrypt(plaintext, password)
+    const data = await encryptWithKey(plaintext, key, vaultSalt)
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       version: 2,
       passwordHash: pwHash,
-      hashSalt: saltB64,
+      hashSalt: bytesToBase64(hashSalt),
       data
     }))
     saveAutoBackup(data, initialPasswords.length)
@@ -107,7 +111,7 @@ export default function useSavedPasswords() {
       localStorage.removeItem(BACKUP_KEY)
     }
 
-    masterPasswordRef.current = password
+    vaultKeyRef.current = { key, salt: vaultSalt }
     passwordsRef.current = initialPasswords
     setSavedPasswords(initialPasswords)
     setIsLocked(false)
@@ -117,16 +121,15 @@ export default function useSavedPasswords() {
     const stored = readRawStorage()
     if (!stored || stored.version !== 2) return false
 
-    const salt = Uint8Array.from(atob(stored.hashSalt), (c) => c.charCodeAt(0))
-    const pwHash = await hashPassword(password, salt)
-
-    if (pwHash !== stored.passwordHash) return false
-
     try {
-      const plaintext = await decrypt(stored.data, password)
+      // Anahtar tek seferde türetilir. AES-GCM yanlış anahtarla çözmeyi reddeder,
+      // bu yüzden ayrıca şifre özeti kontrolüne (ikinci 600.000 iterasyon) gerek yok.
+      const salt = readSalt(stored.data)
+      const key = await deriveVaultKey(password, salt)
+      const plaintext = await decryptWithKey(stored.data, key)
       // Daha önce eksik alanlarla kaydedilmiş kayıtlar da burada onarılır
       const passwords = toVaultEntries(JSON.parse(plaintext))
-      masterPasswordRef.current = password
+      vaultKeyRef.current = { key, salt }
       passwordsRef.current = passwords
       setSavedPasswords(passwords)
       setIsLocked(false)
@@ -137,7 +140,7 @@ export default function useSavedPasswords() {
   }, [])
 
   const lock = useCallback(() => {
-    masterPasswordRef.current = null
+    vaultKeyRef.current = null
     passwordsRef.current = []
     setSavedPasswords([])
     setIsLocked(true)
@@ -182,8 +185,15 @@ export default function useSavedPasswords() {
     ))
   }, [mutate])
 
-  const getMasterPassword = useCallback(() => {
-    return masterPasswordRef.current
+  // Güncel kasayı bellekteki anahtarla şifreleyip .passgen olarak indirir.
+  // Dosya ana şifreyle açılır (salt blob'un içinde); ana şifrenin bellekte olması gerekmez.
+  const exportPasswords = useCallback(async () => {
+    const vaultKey = vaultKeyRef.current
+    if (!vaultKey) return false
+    const list = passwordsRef.current
+    const data = await encryptWithKey(JSON.stringify(list), vaultKey.key, vaultKey.salt)
+    downloadExportFile(data, list.length)
+    return true
   }, [])
 
   return {
@@ -200,6 +210,6 @@ export default function useSavedPasswords() {
     updatePassword,
     importPasswords,
     restorePassword,
-    getMasterPassword
+    exportPasswords
   }
 }

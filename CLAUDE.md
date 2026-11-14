@@ -86,7 +86,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 - State `App.jsx`'te tutulur, child bileşenlere prop olarak geçilir.
 - `GeneratorPanel` → `onGenerate` callback ile geçmişe yazar. Kasaya kaydedilen şifreler geçmişe eklenmez.
 - `HistoryPanel` → `removeFromHistory`, `clearHistory` prop'larını alır.
-- `VaultPanel` → `unlock`, `lock`, `setupMasterPassword`, `removePassword`, `restorePassword`, `updatePassword`, `importPasswords`, `getMasterPassword`, `clearAll` prop'larını alır.
+- `VaultPanel` → `unlock`, `lock`, `setupMasterPassword`, `removePassword`, `restorePassword`, `updatePassword`, `importPasswords`, `exportPasswords`, `clearAll` prop'larını alır. Ana şifre hiçbir bileşene verilmez.
 - `GeneratorPanel` → `savedPasswords` prop'u ile duplikasyon kontrolü yapar. Kasaya `onSaveToVault(entries)` ile tek seferde toplu yazar ve sonucu bekler.
 - **Kasa yazmaları sıralıdır:** `useSavedPasswords` içindeki her değişiklik `mutate(prev => next)` ile sıraya alınır. Yeni kasa işlemi eklerken `next` listesini `savedPasswords` state'inden hesaplama — art arda çağrılarda eski liste kullanılır ve kayıtlar kaybolur.
 - **Dışarıdan gelen kayıtlar normalleştirilir:** İçe aktarma, kilit açma ve migrasyonda her kayıt `normalizeVaultEntry` ile tamamlanır (eksik `charTypes`, `strength`, `length`, `date`, `name`, `id` şifreden/varsayılandan üretilir; bilinmeyen alanlar korunur). Şifresi olmayan kayıtlar atlanır ve içe aktarma önizlemesinde sayısı gösterilir. Hiç geçerli kayıt yoksa içe aktarma butonu kapalıdır.
@@ -100,6 +100,9 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 - Her aktif karakter setinden en az 1 karakter garantile.
 - Pano kopyalamalarında `copyToClipboard()` kullan — 30 saniye sonra pano otomatik temizlenir.
 - Kasa verileri AES-GCM ile şifrelenir, anahtar PBKDF2 (SHA-256, 600.000 iterasyon) ile türetilir.
+- **Ana şifre bellekte tutulmaz:** kilit açılışında (veya kurulumda) anahtar bir kez türetilir ve `useSavedPasswords` içinde dışa aktarılamaz (`extractable: false`) `CryptoKey` olarak tutulur (`vaultKeyRef = { key, salt }`). Kilitlenince silinir. Yazmalar `encryptWithKey` ile yapılır: kasa salt'ı sabit, IV her yazmada yeni.
+- Şifreli blob biçimi değişmez: `base64(salt[16] | iv[12] | ciphertext)`. Kasa, otomatik yedekler ve `.passgen` dosyaları ana şifreyle `decrypt(data, password)` ile açılır. Kilit açma GCM doğrulamasına dayanır; `passwordHash` / `hashSalt` yalnızca eski sürümlerle uyumluluk için yazılır.
+- Base64 dönüşümünde `bytesToBase64` / `base64ToBytes` kullan; `String.fromCharCode(...büyükDizi)` ~200 KB üstünde yığını taşırır.
 - Electron: CSP header aktif, sandbox aktif, dış URL navigasyonu ve popup'lar engelli.
 - Geçmiş en fazla 100 kayıt tutar, 30 günden eski kayıtlar otomatik temizlenir (kullanıcı bu kuralın kalmasını seçti).
 - Geçmiş diske **düz metin yazılmaz**: `passgen_history` değeri `{ version: 2, protected }` biçiminde Electron `safeStorage` (Windows DPAPI) ile şifrelidir (`secure:protect` / `secure:unprotect` IPC, `src/utils/historyStorage.js`). Eski düz dizi biçimi ilk açılışta şifreli biçime çevrilir. safeStorage yoksa (web modu) geçmiş yalnızca bellekte tutulur. Çözülemeyen veri silinmez, `passgen_history_unreadable` anahtarına kopyalanır.

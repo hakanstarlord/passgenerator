@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { encrypt, decrypt, hashPassword } from '../crypto'
+import { encrypt, decrypt, hashPassword, deriveVaultKey, encryptWithKey, decryptWithKey, readSalt, bytesToBase64, base64ToBytes } from '../crypto'
 
 describe('encrypt / decrypt round-trip', () => {
   it('şifrelenmiş veriyi doğru şifreyle çözer', async () => {
@@ -66,5 +66,63 @@ describe('hashPassword', () => {
     expect(hash.length).toBeGreaterThan(0)
     // base64 karakter kontrolü
     expect(hash).toMatch(/^[A-Za-z0-9+/=]+$/)
+  })
+})
+
+describe('anahtarla şifreleme (encryptWithKey / decryptWithKey)', () => {
+  const password = 'anaŞifre-Test-2026!'
+
+  it('encryptWithKey çıktısı ana şifreyle decrypt edilebilir (eski yol uyumu)', async () => {
+    const salt = crypto.getRandomValues(new Uint8Array(16))
+    const key = await deriveVaultKey(password, salt)
+    const encrypted = await encryptWithKey('kasa verisi', key, salt)
+    expect(await decrypt(encrypted, password)).toBe('kasa verisi')
+  })
+
+  it('encrypt(password) çıktısı blob salt\'ından türetilen anahtarla açılır', async () => {
+    const encrypted = await encrypt('eski biçim', password)
+    const key = await deriveVaultKey(password, readSalt(encrypted))
+    expect(await decryptWithKey(encrypted, key)).toBe('eski biçim')
+  })
+
+  it('aynı anahtarla yazmalarda salt aynı, IV ve çıktı farklıdır', async () => {
+    const salt = crypto.getRandomValues(new Uint8Array(16))
+    const key = await deriveVaultKey(password, salt)
+    const a = await encryptWithKey('aynı metin', key, salt)
+    const b = await encryptWithKey('aynı metin', key, salt)
+    expect(a).not.toBe(b)
+    expect(readSalt(a)).toEqual(salt)
+    expect(readSalt(b)).toEqual(salt)
+    expect(base64ToBytes(a).slice(16, 28)).not.toEqual(base64ToBytes(b).slice(16, 28))
+  })
+
+  it('yanlış anahtarla çözme hata verir', async () => {
+    const salt = crypto.getRandomValues(new Uint8Array(16))
+    const encrypted = await encryptWithKey('gizli', await deriveVaultKey(password, salt), salt)
+    const wrongKey = await deriveVaultKey('yanlışŞifre', salt)
+    await expect(decryptWithKey(encrypted, wrongKey)).rejects.toThrow()
+  })
+
+  it('geçersiz salt uzunluğunu reddeder', async () => {
+    const salt = crypto.getRandomValues(new Uint8Array(16))
+    const key = await deriveVaultKey(password, salt)
+    await expect(encryptWithKey('x', key, new Uint8Array(8))).rejects.toThrow('Geçersiz salt uzunluğu.')
+  })
+
+  it('1 MB veriyi şifreleyip çözer (base64 taşma düzeltmesi)', async () => {
+    const big = 'ş'.repeat(512 * 1024) + 'a'.repeat(512 * 1024)
+    const salt = crypto.getRandomValues(new Uint8Array(16))
+    const key = await deriveVaultKey(password, salt)
+    const encrypted = await encryptWithKey(big, key, salt)
+    expect(await decryptWithKey(encrypted, key)).toBe(big)
+  })
+})
+
+describe('bytesToBase64 / base64ToBytes', () => {
+  it('büyük diziyi taşmadan gidiş-dönüş yapar', () => {
+    const bytes = crypto.getRandomValues(new Uint8Array(300000).subarray(0, 65536))
+    const large = new Uint8Array(300000)
+    large.set(bytes)
+    expect(base64ToBytes(bytesToBase64(large))).toEqual(large)
   })
 })

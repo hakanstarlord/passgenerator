@@ -1,4 +1,4 @@
-import { encrypt, decrypt } from './crypto'
+import { decrypt } from './crypto'
 
 const EXPORT_VERSION = 1
 
@@ -14,11 +14,9 @@ export function buildExportFile(encryptedData, count) {
   }, null, 2)
 }
 
-export async function exportVault(passwords, masterPassword) {
-  const plaintext = JSON.stringify(passwords)
-  const encryptedData = await encrypt(plaintext, masterPassword)
-
-  const blob = new Blob([buildExportFile(encryptedData, passwords.length)], { type: 'application/json' })
+// Şifreli kasa verisini .passgen dosyası olarak indirir
+export function downloadExportFile(encryptedData, count) {
+  const blob = new Blob([buildExportFile(encryptedData, count)], { type: 'application/json' })
   const filename = `passgen-yedek-${new Date().toISOString().slice(0, 10)}.passgen`
   downloadFile(blob, filename)
 }

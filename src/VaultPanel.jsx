@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { Copy, Check, Trash2, Eye, EyeOff, Search, AlertTriangle, Lock, Unlock, KeyRound, ShieldAlert, Pencil, X, Download, Upload, FolderOpen, Timer, Shield, Users, Landmark, Mail, ShoppingBag, Gamepad2, Briefcase, Tag, Undo2 } from 'lucide-react'
 import { copyToClipboard } from './utils/clipboard'
 import { calculateStrength, calculateEntropy } from './utils/passwordGenerator'
-import { exportVault, parseImportFile, decryptImportData } from './utils/exportImport'
+import { parseImportFile, decryptImportData } from './utils/exportImport'
 import { flagDuplicateEntries } from './utils/duplicateCheck'
 import { normalizeVaultEntry } from './utils/vaultEntry'
 import { getMasterPasswordProblem, MIN_MASTER_PASSWORD_LENGTH } from './utils/masterPassword'
@@ -662,7 +662,7 @@ export default function VaultPanel({
   restorePassword,
   updatePassword,
   importPasswords,
-  getMasterPassword,
+  exportPasswords,
   clearAll,
   isLocked,
   isInitialized,
@@ -726,9 +726,7 @@ export default function VaultPanel({
   }
 
   async function handleExport() {
-    const masterPassword = getMasterPassword()
-    if (!masterPassword) return
-    await exportVault(passwords, masterPassword)
+    await exportPasswords()
   }
 
   function handleImport(entries, mode) {
