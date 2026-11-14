@@ -128,22 +128,25 @@ function compareVersions(a, b) {
 
 const MAX_PROTECTED_LENGTH = 5 * 1024 * 1024
 
-// Metni Windows hesabına bağlı anahtarla (DPAPI) şifreler; kullanılamıyorsa null
-function protectText(text) {
+// Metni Windows hesabına bağlı anahtarla (DPAPI) şifreler; kullanılamıyorsa null.
+// Electron 45+ async safeStorage API'si (senkron metotlar 46'da kalkıyor). Senkron API ile
+// şifrelenmiş eski veri de decryptStringAsync ile çözülür.
+async function protectText(text) {
   if (typeof text !== 'string' || text.length > MAX_PROTECTED_LENGTH) return null
-  if (!safeStorage.isEncryptionAvailable()) return null
   try {
-    return safeStorage.encryptString(text).toString('base64')
+    if (!(await safeStorage.isAsyncEncryptionAvailable())) return null
+    return (await safeStorage.encryptStringAsync(text)).toString('base64')
   } catch {
     return null
   }
 }
 
-function unprotectText(encoded) {
+async function unprotectText(encoded) {
   if (typeof encoded !== 'string' || encoded.length > MAX_PROTECTED_LENGTH * 2) return null
-  if (!safeStorage.isEncryptionAvailable()) return null
   try {
-    return safeStorage.decryptString(Buffer.from(encoded, 'base64'))
+    if (!(await safeStorage.isAsyncEncryptionAvailable())) return null
+    const { result } = await safeStorage.decryptStringAsync(Buffer.from(encoded, 'base64'))
+    return typeof result === 'string' ? result : null
   } catch {
     return null
   }
@@ -206,9 +209,14 @@ app.whenReady().then(() => {
   setTimeout(() => checkForUpdates(), 5000)
 })
 
-// Uygulama 30 sn dolmadan kapanırsa kopyalanan şifre panoda kalmasın
-app.on('will-quit', () => {
-  secretClipboard.clearNow()
+// Uygulama 30 sn dolmadan kapanırsa kopyalanan şifre panoda kalmasın.
+// Pano API'si async olduğu için çıkış, temizlik bitene kadar bir kez ertelenir.
+let clipboardClearedOnQuit = false
+app.on('will-quit', (event) => {
+  if (clipboardClearedOnQuit || !secretClipboard.hasPending()) return
+  event.preventDefault()
+  clipboardClearedOnQuit = true
+  secretClipboard.clearNow().catch(() => {}).finally(() => app.quit())
 })
 
 app.on('window-all-closed', () => {

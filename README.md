@@ -5,7 +5,7 @@ Güvenli ve kullanımı kolay masaüstü şifre üretici uygulaması.
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3-06B6D4?logo=tailwindcss&logoColor=white)
-![Electron](https://img.shields.io/badge/Electron-41-47848F?logo=electron&logoColor=white)
+![Electron](https://img.shields.io/badge/Electron-45-47848F?logo=electron&logoColor=white)
 
 ## Özellikler
 
@@ -66,7 +66,7 @@ npm run electron:build
 | Vite 8 | Build aracı |
 | TailwindCSS 3 | Stil |
 | Lucide React | İkonlar |
-| Electron 41 | Masaüstü uygulaması |
+| Electron 45 | Masaüstü uygulaması |
 
 ## Proje Yapısı
 

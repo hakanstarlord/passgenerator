@@ -7,7 +7,15 @@ Amaç: Tekrar eden hataları önlemek, proje kurallarını korumak.
 
 ## Proje Özeti
 
-Şifre üretici masaüstü uygulaması. React 19 + Vite 8 + TailwindCSS 3 + Lucide React + Electron 41.
+Şifre üretici masaüstü uygulaması. React 19 + Vite 8 + TailwindCSS 3 + Lucide React + Electron 45.
+
+### Electron sürüm notları
+
+- **Electron 44+:** `clipboard.readText()` / `writeText()` Promise döndürür; her zaman `await` et (senkron karşılaştırma sessizce bozulur). `clipboard` modülü renderer'da yok, yalnızca ana süreçte.
+- **Electron 45+:** `safeStorage` için async API kullan (`isAsyncEncryptionAvailable`, `encryptStringAsync`, `decryptStringAsync` → `{ result }`). Senkron metotlar kullanımdan kalktı, Electron 46'da siliniyor.
+- **Electron 45+:** Sandbox'lı preload'da `require` yalnızca `electron` yükler; `Buffer` ve `setImmediate` yok.
+- Electron yükseltmeden önce resmi `docs/breaking-changes.md` dosyasını kullandığımız API'lere göre tara.
+- npm 10.9.2'nin bağımlılık çözücüsü `vitest` güncellemesinde `Cannot read properties of null (reading 'edgesOut')` hatası verir; geçici çözüm `npx -y npm@11 install ...`. npm 11 kurulum betiklerini çalıştırmaz; `electron-winstaller` için `vendor/7z.exe` ve `vendor/rcedit.exe`'nin yerinde olduğunu kontrol et.
 
 ## Dil Kuralları
 
