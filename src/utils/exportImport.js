@@ -68,10 +68,15 @@ export async function parseImportFile(file) {
 }
 
 export async function decryptImportData(fileData, password) {
+  let entries
   try {
     const plaintext = await decrypt(fileData.data, password)
-    return JSON.parse(plaintext)
+    entries = JSON.parse(plaintext)
   } catch {
     throw new Error('Şifre yanlış veya dosya bozuk.')
   }
+  if (!Array.isArray(entries)) {
+    throw new Error('Dosyada kayıt listesi bulunamadı.')
+  }
+  return entries
 }

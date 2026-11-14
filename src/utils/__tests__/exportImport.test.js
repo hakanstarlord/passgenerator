@@ -65,3 +65,11 @@ describe('buildExportFile', () => {
     await expect(decryptImportData(parsed, 'yanlışŞifre')).rejects.toThrow('Şifre yanlış veya dosya bozuk.')
   })
 })
+
+describe('decryptImportData', () => {
+  it('kayıt listesi olmayan dosyayı reddeder', async () => {
+    const encrypted = await encrypt(JSON.stringify({ name: 'liste değil' }), 'anaŞifre')
+    const parsed = await parseImportFile(createFile(buildExportFile(encrypted, 1)))
+    await expect(decryptImportData(parsed, 'anaŞifre')).rejects.toThrow('Dosyada kayıt listesi bulunamadı.')
+  })
+})

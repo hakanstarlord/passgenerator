@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { encrypt, decrypt, hashPassword } from '../utils/crypto'
 import { calculateStrength } from '../utils/passwordGenerator'
-import { normalizeCategory } from '../utils/categories'
+import { normalizeVaultEntry } from '../utils/vaultEntry'
 import { saveAutoBackup } from '../utils/exportImport'
 
 const STORAGE_KEY = 'passgen_vault'
@@ -18,6 +18,11 @@ function readRawStorage() {
 
 function isLegacyData(stored) {
   return Array.isArray(stored)
+}
+
+// Dışarıdan gelen kayıtları kasa biçimine getirir; şifresi olmayanlar atlanır
+function toVaultEntries(list) {
+  return list.map(normalizeVaultEntry).filter(Boolean)
 }
 
 export default function useSavedPasswords() {
@@ -83,7 +88,7 @@ export default function useSavedPasswords() {
     // Eski düz metin verisi varsa migrasyon yap
     if (needsMigration) {
       localStorage.setItem(BACKUP_KEY, JSON.stringify(stored))
-      initialPasswords = stored.map(normalizeCategory)
+      initialPasswords = toVaultEntries(stored)
     }
 
     const plaintext = JSON.stringify(initialPasswords)
@@ -119,7 +124,8 @@ export default function useSavedPasswords() {
 
     try {
       const plaintext = await decrypt(stored.data, password)
-      const passwords = JSON.parse(plaintext).map(normalizeCategory)
+      // Daha önce eksik alanlarla kaydedilmiş kayıtlar da burada onarılır
+      const passwords = toVaultEntries(JSON.parse(plaintext))
       masterPasswordRef.current = password
       passwordsRef.current = passwords
       setSavedPasswords(passwords)
@@ -163,14 +169,10 @@ export default function useSavedPasswords() {
 
   const importPasswords = useCallback((entries, mode) => {
     return mutate((prev) => {
-      if (mode === 'replace') {
-        return entries.map(e => normalizeCategory({ ...e, id: crypto.randomUUID() }))
-      }
+      const incoming = toVaultEntries(entries).map(e => ({ ...e, id: crypto.randomUUID() }))
+      if (mode === 'replace') return incoming
       const existingPasswords = new Set(prev.map(p => p.password))
-      const newEntries = entries
-        .filter(e => !existingPasswords.has(e.password))
-        .map(e => normalizeCategory({ ...e, id: crypto.randomUUID() }))
-      return [...prev, ...newEntries]
+      return [...prev, ...incoming.filter(e => !existingPasswords.has(e.password))]
     })
   }, [mutate])
 

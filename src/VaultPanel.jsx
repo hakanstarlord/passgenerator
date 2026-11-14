@@ -4,6 +4,7 @@ import { copyToClipboard } from './utils/clipboard'
 import { calculateStrength, calculateEntropy } from './utils/passwordGenerator'
 import { exportVault, parseImportFile, decryptImportData } from './utils/exportImport'
 import { flagDuplicateEntries } from './utils/duplicateCheck'
+import { normalizeVaultEntry } from './utils/vaultEntry'
 import { CATEGORIES, getCategoryLabel, getCategoryIcon } from './utils/categories'
 import useUnlockRateLimit from './hooks/useUnlockRateLimit'
 import useUndoDelete from './hooks/useUndoDelete'
@@ -438,6 +439,7 @@ function ImportModal({ onImport, onClose, savedPasswords }) {
   const [fileData, setFileData] = useState(null)
   const [password, setPassword] = useState('')
   const [entries, setEntries] = useState([])
+  const [skippedCount, setSkippedCount] = useState(0)
   const [mode, setMode] = useState('merge')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -465,8 +467,10 @@ function ImportModal({ onImport, onClose, savedPasswords }) {
     setError('')
     try {
       const decrypted = await decryptImportData(fileData, password)
-      const flagged = flagDuplicateEntries(decrypted, savedPasswords)
-      setEntries(flagged)
+      // Eksik alanlar tamamlanır; şifresi olmayan kayıtlar önizlemede sayılıp atlanır
+      const valid = decrypted.map(normalizeVaultEntry).filter(Boolean)
+      setSkippedCount(decrypted.length - valid.length)
+      setEntries(flagDuplicateEntries(valid, savedPasswords))
       setStep('preview')
     } catch (err) {
       setError(err.message)
@@ -476,6 +480,7 @@ function ImportModal({ onImport, onClose, savedPasswords }) {
   }
 
   function handleImport() {
+    if (entries.length === 0) return
     if (mode === 'replace' && !replaceConfirm) {
       setReplaceConfirm(true)
       return
@@ -572,6 +577,11 @@ function ImportModal({ onImport, onClose, savedPasswords }) {
               {duplicateCount > 0 && (
                 <span className="text-amber-400"> ({duplicateCount} adet mevcut kasanızla eşleşiyor)</span>
               )}
+              {skippedCount > 0 && (
+                <span className="block mt-1 text-amber-400">
+                  {skippedCount} kayıt şifre içermediği için atlanacak.
+                </span>
+              )}
             </p>
 
             <div className="max-h-48 overflow-y-auto space-y-2">
@@ -633,7 +643,8 @@ function ImportModal({ onImport, onClose, savedPasswords }) {
 
             <button
               onClick={handleImport}
-              className={`w-full py-3 rounded-xl font-semibold text-sm transition-all shadow-lg ${
+              disabled={entries.length === 0}
+              className={`w-full py-3 rounded-xl font-semibold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
                 replaceConfirm
                   ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/25'
                   : 'bg-indigo-500 hover:bg-indigo-600 text-white shadow-indigo-500/25'

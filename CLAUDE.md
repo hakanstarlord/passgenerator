@@ -53,6 +53,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 │       ├── duplicateCheck.js      # Kasada duplikasyon tespiti
 │       ├── exportImport.js        # Kasa dışa/içe aktarma (.passgen dosya formatı)
 │       ├── categories.js          # Kasa kategorileri (etiket, ikon, normalizeCategory)
+│       ├── vaultEntry.js          # normalizeVaultEntry: eksik alanları şifreden tamamlar
 │       └── __tests__/             # Vitest birim testleri (utils/ için)
 ├── release/                       # Electron build çıktısı (git-ignore)
 ```
@@ -86,6 +87,7 @@ passwordgenerator/                 # Repo kökü = proje kökü (iç içe klasö
 - `VaultPanel` → `unlock`, `lock`, `setupMasterPassword`, `removePassword`, `restorePassword`, `updatePassword`, `importPasswords`, `getMasterPassword`, `clearAll` prop'larını alır.
 - `GeneratorPanel` → `savedPasswords` prop'u ile duplikasyon kontrolü yapar. Kasaya `onSaveToVault(entries)` ile tek seferde toplu yazar ve sonucu bekler.
 - **Kasa yazmaları sıralıdır:** `useSavedPasswords` içindeki her değişiklik `mutate(prev => next)` ile sıraya alınır. Yeni kasa işlemi eklerken `next` listesini `savedPasswords` state'inden hesaplama — art arda çağrılarda eski liste kullanılır ve kayıtlar kaybolur.
+- **Dışarıdan gelen kayıtlar normalleştirilir:** İçe aktarma, kilit açma ve migrasyonda her kayıt `normalizeVaultEntry` ile tamamlanır (eksik `charTypes`, `strength`, `length`, `date`, `name`, `id` şifreden/varsayılandan üretilir; bilinmeyen alanlar korunur). Şifresi olmayan kayıtlar atlanır ve içe aktarma önizlemesinde sayısı gösterilir. Hiç geçerli kayıt yoksa içe aktarma butonu kapalıdır.
 - localStorage anahtarları: `passgen_history` (geçmiş), `passgen_vault` (kasa, şifreli)
 
 ## Güvenlik
